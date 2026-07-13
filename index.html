@@ -759,7 +759,9 @@ function analyze(A){
       if (sc2 > bs2){ bs2 = sc2; deepSup = {p: r.p, m: r.m, trust: t2}; }
     }
   }
-  pred.top = {score: Math.round(thScore), items: thItems, farSup, deepSup,
+  /* vùng VÀO short = tường bán tin cao gần nhất phía trên (kháng cự) */
+  const entryRes = bestWall(A.asks, 'a', mid, 0.15, false);
+  pred.top = {score: Math.round(thScore), items: thItems, farSup, deepSup, entryRes,
     pumpLow: (market.pumpLow && market.pumpLow < mid * 0.97) ? market.pumpLow : null, f8};
 
   /* ghi sổ kèo săn đỉnh (kind:'top', chấm riêng): điểm ≥70 → cược "giảm 1 biên khung
@@ -856,10 +858,17 @@ function renderTop(){
   ).join('');
   const mid = pred.mid;
   const tgt = [];
+  if (T.entryRes){
+    const oneEx = bitCount(T.entryRes.ex || 0) <= 1;
+    tgt.push(`<span class="lbl">VÙNG VÀO short (kháng cự)</span> ${fmtPrice(T.entryRes.p, pred.step)} (${fmtPct((T.entryRes.p / mid - 1) * 100)}) · tường bán ${fmtMoney(T.entryRes.m)} · tin ${T.entryRes.trust}${oneEx ? ' · <span class="w1">⚠1 sàn</span>' : ''}<br>`);
+  }
   if (T.farSup) tgt.push(`<span class="lbl">đỡ lớn</span> ${fmtPrice(T.farSup.p, pred.step)} (${fmtPct((T.farSup.p / mid - 1) * 100)}) · tin ${T.farSup.trust}`);
   if (T.deepSup) tgt.push(`<span class="lbl">đỡ sâu</span> ${fmtPrice(T.deepSup.p, pred.step)} (${fmtPct((T.deepSup.p / mid - 1) * 100)})`);
   if (T.pumpLow) tgt.push(`<span class="lbl">chân pump</span> ${fmtPrice(T.pumpLow, pred.step)} (${fmtPct((T.pumpLow / mid - 1) * 100)})`);
-  $('thTgt').innerHTML = tgt.length ? '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.join(' &nbsp;·&nbsp; ') : '';
+  $('thTgt').innerHTML = tgt.length
+    ? (T.entryRes ? tgt[0] + '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.slice(1).join(' &nbsp;·&nbsp; ')
+                  : '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.join(' &nbsp;·&nbsp; '))
+    : '';
   let fundTxt = '';
   if (T.f8 !== null && T.f8 !== undefined && isFinite(T.f8)){
     const daily = T.f8 * 3 * 100;
