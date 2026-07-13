@@ -488,22 +488,33 @@ function updateWalls(A){
   for (const key in wallBook){
     const w = wallBook[key];
     if (w.near && w.l && now - w.l > 4000){
+      w.near = false;
       /* chỉ kết luận khi GIÁ VẪN Ở GẦN mốc đó — giá đã đi xa thì tường chỉ là xoay vòng, không phạt */
       const stillNear = w.p === undefined || Math.abs(A.mid - w.p) <= leaveD;
       if (stillNear){
-        if (w.cur >= 0.6 * w.mx) w.pl++;
-        else w.fl = (w.fl || 0) + 1;
+        /* bước giá đổi làm bucket bị "đổi tên": nếu vùng giá đó VẪN còn ≥40% tiền
+           thì tường không hề rút — xóa bản ghi cũ lặng lẽ, không phạt oan */
+        let rekeyed = false;
+        if (w.p !== undefined){
+          const rows = key.charAt(0) === 'b' ? A.bids : A.asks;
+          let zone = 0;
+          for (const r of rows){ if (Math.abs(r.p - w.p) <= 1.5 * A.step) zone += r.m; }
+          if (zone >= 0.4 * w.mx){ delete wallBook[key]; rekeyed = true; }
+        }
+        if (!rekeyed){
+          if (w.cur >= 0.6 * w.mx) w.pl++;
+          else w.fl = (w.fl || 0) + 1;
+        }
       }
-      w.near = false;
     }
-    if (w.l && now - w.l > 24 * 3600e3) delete wallBook[key];
+    if (wallBook[key] && w.l && now - w.l > 24 * 3600e3) delete wallBook[key];
   }
 }
 function wallTrust(side, p){
   const w = wallBook[wallKey(side, p)];
   if (!w) return 30;
   const ageMin = ((w.l || w.f) - w.f) / 60000;
-  let s = 30 + Math.min(30, ageMin * 1.5) + w.sv * 15 + (w.fl || 0) * 8 - w.pl * 30
+  let s = 30 + Math.min(30, ageMin * 1.5) + w.sv * 15 + (w.fl || 0) * 8 - Math.min(w.pl, 3) * 30
         + (w.cx >= 2 ? 10 : 0) + (w.cx >= 3 ? 5 : 0);
   return clamp(Math.round(s), 0, 100);
 }
@@ -677,11 +688,13 @@ function analyze(A){
   if (Math.abs(S) >= 25 && act.length >= 2 && sup && res){
     const dir = Math.sign(S);
     const tgtP = dir > 0 ? res.p : sup.p;
+    const oppP = dir > 0 ? sup.p : res.p;
     const dist = Math.abs(tgtP - mid) / mid;
+    const distO = Math.abs(oppP - mid) / mid;   /* mốc ngược cũng phải đủ xa — sát quá là thua oan vì nhiễu */
     const lastE = predLog[predLog.length - 1];
     const spaced = !lastE || now - lastE.t > 60e3;
     const fresh = !lastE || lastE.hit !== null || lastE.dir !== dir;
-    if (dist >= 0.002 && spaced && fresh){
+    if (dist >= 0.002 && distO >= 0.002 && spaced && fresh){
         predLog.push({
           t: now, mid, dir, fh: frameH,
           tgt: dir > 0 ? res.p : sup.p, opp: dir > 0 ? sup.p : res.p, hit: null,
