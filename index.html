@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sổ Lệnh Gộp — Perp USDT</title>
+<style>
+:root{
+  --bg:#0b0e11; --panel:#14181f; --line:#232830;
+  --text:#e8ecf1; --dim:#8a94a3;
+  --green:#0ecb81; --red:#f6465d;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--text); font:14px/1.45 system-ui,'Segoe UI',sans-serif; padding:16px; max-width:780px; margin:0 auto;}
+header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
+#sym{background:var(--panel); border:1px solid var(--line); color:var(--text); font:700 16px Consolas,monospace; padding:8px 10px; border-radius:8px; width:130px; text-transform:uppercase;}
+#sym:focus{outline:1px solid #2b6cee;}
+#totalBlock{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; text-align:center; margin-bottom:12px;}
+#netLabel{color:var(--dim); font-size:12px; letter-spacing:1px;}
+#net{font:700 42px Consolas,monospace; margin:2px 0; color:var(--dim);}
+#net.pos{color:var(--green);}
+#net.neg{color:var(--red);}
+#subTotals{color:var(--dim); font-size:13px;}
+#subTotals b{color:var(--text); font-family:Consolas,monospace; font-size:14px;}
+#hint{color:var(--dim); font-size:11px; margin-top:4px;}
+#chg{color:var(--dim); font-size:12px; margin-top:5px;}
+#chg b{font-family:Consolas,monospace;}
+#chg .up{color:var(--green);}
+#chg .dn{color:var(--red);}
+#pAlert{color:#e2b93b; font-size:12px; margin-top:7px; line-height:1.5;}
+#predict{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
+#pLean{font-weight:700; font-size:15px; padding:8px 12px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;}
+#pLean.long{background:rgba(14,203,129,.12); color:var(--green);}
+#pLean.short{background:rgba(246,70,93,.12); color:var(--red);}
+#pLean.neutral{background:#171b22; color:var(--dim);}
+#pLean .conf{font-size:12px; font-weight:400; font-family:Consolas,monospace; opacity:.9;}
+#pGrid{margin:10px 2px 2px;}
+.prow{display:grid; grid-template-columns:175px 115px 80px 1fr; gap:8px; padding:2.5px 0; font-size:13px; align-items:baseline;}
+.prow .pl{font-weight:600;}
+.pl .up{color:var(--green);} .pl .dn{color:var(--red);}
+.prow .pp{font-family:Consolas,monospace; font-weight:700;}
+.prow .pc{font-family:Consolas,monospace; color:var(--dim); text-align:right;}
+.prow .pw{color:var(--dim); font-size:12px;}
+.psep{border-top:1px solid var(--line); margin:6px 0;}
+#pBasis{color:var(--dim); font-size:12px; margin-top:8px;}
+#pWarn{color:var(--dim); font-size:11px; margin-top:3px; opacity:.8;}
+#book{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+.bhead{display:grid; grid-template-columns:110px 100px 120px 1fr; gap:8px; padding:8px 14px; color:var(--dim); font-size:12px; border-bottom:1px solid var(--line);}
+.bhead .q,.bhead .m{text-align:right;}
+.row{display:grid; grid-template-columns:110px 100px 120px 1fr; gap:8px; padding:2.5px 14px; font-family:Consolas,monospace; font-size:13px; align-items:center;}
+.row .p{font-weight:700;}
+.ask .p{color:var(--red);}
+.bid .p{color:var(--green);}
+.row .q,.row .m{text-align:right;}
+.barwrap{height:12px; position:relative;}
+.bar{position:absolute; left:0; top:0; bottom:0; border-radius:3px;}
+.ask .bar{background:rgba(246,70,93,.38);}
+.bid .bar{background:rgba(14,203,129,.38);}
+.wl{position:absolute; right:2px; top:-1px; font-size:10px; color:var(--text); font-family:system-ui,sans-serif; opacity:.85;}
+#mid{display:flex; justify-content:center; align-items:baseline; gap:10px; padding:9px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:#0f1319; font-family:Consolas,monospace;}
+#mid span{color:var(--dim); font-size:11px; font-family:system-ui,sans-serif;}
+#midPrice{font-weight:700; font-size:17px;}
+#empty{padding:30px; text-align:center; color:var(--dim);}
+footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
+</style>
+</head>
+<body>
+
+<header>
+  <input id="sym" value="BTC" placeholder="nhập mã coin" spellcheck="false">
+</header>
+
+<div id="totalBlock">
+  <div id="netLabel">TỔNG (TIỀN CHỜ MUA − TIỀN CHỜ BÁN)</div>
+  <div id="net">—</div>
+  <div id="subTotals">Chờ MUA: <b id="buyT">—</b> &nbsp;·&nbsp; Chờ BÁN: <b id="sellT">—</b></div>
+  <div id="chg"></div>
+  <div id="hint">Dương = tiền chờ MUA dày hơn &nbsp;·&nbsp; Âm = tiền chờ BÁN dày hơn</div>
+</div>
+
+<div id="predict">
+  <div id="pLean" class="neutral">● Đang chờ dữ liệu…</div>
+  <div id="pGrid" style="display:none"></div>
+  <div id="pAlert"></div>
+  <div id="pBasis"></div>
+  <div id="pWarn">⚠ Nhận định từ dữ liệu, không phải lời khuyên — tường rút là vô hiệu</div>
+</div>
+
+<div id="book">
+  <div class="bhead"><div>Giá</div><div class="q">Khối lượng</div><div class="m">Thành tiền</div><div></div></div>
+  <div id="asks"></div>
+  <div id="mid"><span>GIÁ HIỆN TẠI</span><div id="midPrice">—</div></div>
+  <div id="bids"></div>
+  <div id="empty" style="display:none">Đang kết nối các sàn…</div>
+</div>
+
+<footer>
+  Chỉ hiển thị <b>lệnh CHƯA khớp</b> (đang treo chờ trên sổ). Gộp sổ lệnh perpetual USDT từ:
+  Binance (20 mốc sát giá) · Bybit (200) · OKX (400) · Bitget (toàn bộ sổ) — hiển thị
+  <b>tất cả</b> các mốc có tiền treo, bước giá tự điều chỉnh theo độ sâu dữ liệu.
+  TỔNG tính trên toàn bộ mốc hiển thị. Các sàn cho độ sâu khác nhau nên các mốc xa
+  chủ yếu đến từ sàn có sổ sâu hơn.
+</footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const EX = [
+  {key:'binance', label:'Binance'},
+  {key:'bybit',   label:'Bybit'},
+  {key:'okx',     label:'OKX'},
+  {key:'bitget',  label:'Bitget'},
+];
+const conns = {};
+let gen = 0;
+
+function mkConn(key, label){
+  conns[key] = {key, label, state:'off', note:'chưa chạy', variant:'',
+    bids:new Map(), asks:new Map(), pMul:1, qMul:1, lastMsg:0, ws:null, timers:[],
+    exMid:null, excluded:false};
+}
+EX.forEach((e, i) => { mkConn(e.key, e.label); conns[e.key].bit = 1 << i; });
+
+function setState(c, s, note){ c.state = s; c.note = note || ''; }
+
+function clearConn(c){
+  if (c.ws){ try{ c.ws.onclose = null; c.ws.onmessage = null; c.ws.close(); }catch(e){} }
+  if (c.ws2){ try{ c.ws2.onclose = null; c.ws2.onmessage = null; c.ws2.close(); }catch(e){} }
+  c.ws = null; c.ws2 = null;
+  c.timers.forEach(clearInterval); c.timers = [];
+  c.bids.clear(); c.asks.clear();
+  c.lastMsg = 0; c.pMul = 1; c.qMul = 1; c.variant = '';
+  c.exMid = null; c.excluded = false;
+}
+
+/* arr: các cặp [priceStr, qtyStr] theo đơn vị gốc của sàn */
+function applySide(map, arr, replace){
+  if (replace) map.clear();
+  for (const it of arr){
+    const p = it[0], q = parseFloat(it[1]);
+    if (!isFinite(q)) continue;
+    if (q === 0) map.delete(p); else map.set(p, q);
+  }
+}
+
+function scheduleRetry(c, g, fn, note){
+  setState(c, 'wait', note || 'mất kết nối — thử lại sau 3s');
+  c.timers.push(setTimeout(() => { if (g === gen) fn(); }, 3000));
+}
+
+/* ---------- BINANCE (USDT-M futures) ---------- */
+function startBinance(sym, g, variant){
+  const c = conns.binance;
+  clearConn(c);
+  if (variant){ c.variant = '1000×'; c.pMul = 1/1000; c.qMul = 1000; }
+  const stream = ((variant ? '1000' : '') + sym + 'usdt').toLowerCase() + '@depth20@100ms';
+  let ws;
+  try { ws = new WebSocket('wss://fstream.binance.com/ws/' + stream); }
+  catch(e){ setState(c, 'off', 'không mở được kết nối'); return; }
+  c.ws = ws;
+  let opened = false;
+  setState(c, 'wait', 'đang kết nối');
+  ws.onopen = () => { opened = true; };
+  ws.onmessage = e => {
+    if (g !== gen) return;
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    const b = d.b || d.bids, a = d.a || d.asks;
+    if (!b && !a) return;
+    c.lastMsg = Date.now();
+    if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
+    applySide(c.bids, b || [], true);
+    applySide(c.asks, a || [], true);
+  };
+  ws.onclose = () => {
+    if (g !== gen || c.ws !== ws) return;
+    scheduleRetry(c, g, () => startBinance(sym, g, variant));
+  };
+  /* socket thứ 2: lệnh ĐÃ khớp (aggTrade) + thanh lý (forceOrder) */
+  const s2 = ((variant ? '1000' : '') + sym + 'usdt').toLowerCase();
+  try {
+    const ws2 = new WebSocket('wss://fstream.binance.com/stream?streams=' + s2 + '@aggTrade/' + s2 + '@forceOrder');
+    c.ws2 = ws2;
+    ws2.onmessage = e => {
+      if (g !== gen) return;
+      let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
+      const d = m.data;
+      if (!d) return;
+      if (d.e === 'aggTrade'){
+        /* m=true: bên mua là maker → lệnh chủ động là BÁN */
+        pushTrade((d.m ? -1 : 1) * parseFloat(d.p) * c.pMul * parseFloat(d.q) * c.qMul);
+      } else if (d.e === 'forceOrder' && d.o){
+        const o = d.o;
+        const px = parseFloat(o.ap || o.p) * c.pMul, q = parseFloat(o.q) * c.qMul;
+        if (isFinite(px) && isFinite(q)) pushLiq(o.S === 'SELL' ? 'long' : 'short', px * q);
+      }
+    };
+  } catch(e){}
+
+  /* probe: sau 6s không có dữ liệu — nếu socket chưa từng mở là lỗi mạng (thử lại),
+     nếu mở rồi mà im lặng là stream không tồn tại (thử biến thể 1000×, hết thì báo off) */
+  c.timers.push(setTimeout(() => {
+    if (g !== gen || c.ws !== ws || c.lastMsg) return;
+    clearConn(c);
+    if (!opened) scheduleRetry(c, g, () => startBinance(sym, g, variant), 'mạng chậm — thử lại sau 3s');
+    else if (!variant) startBinance(sym, g, true);
+    else setState(c, 'off', 'không có cặp này');
+  }, 6000));
+}
+
+/* ---------- BYBIT (linear perp) — thử lần lượt các kiểu tên hợp đồng ---------- */
+const BYBIT_VARIANTS = [
+  {pair: s => s + 'USDT',             m: 1,       tag: ''},
+  {pair: s => '1000' + s + 'USDT',    m: 1000,    tag: '1000×'},
+  {pair: s => s + '1000USDT',         m: 1000,    tag: '1000×'},
+  {pair: s => '10000' + s + 'USDT',   m: 10000,   tag: '10000×'},
+  {pair: s => '1000000' + s + 'USDT', m: 1000000, tag: '1M×'},
+];
+function startBybit(sym, g, vi){
+  vi = vi || 0;
+  const c = conns.bybit;
+  clearConn(c);
+  if (vi >= BYBIT_VARIANTS.length){ setState(c, 'off', 'không có cặp này'); return; }
+  const v = BYBIT_VARIANTS[vi];
+  if (v.m !== 1){ c.variant = v.tag; c.pMul = 1 / v.m; c.qMul = v.m; }
+  const pair = v.pair(sym);
+  let ws;
+  try { ws = new WebSocket('wss://stream.bybit.com/v5/public/linear'); }
+  catch(e){ setState(c, 'off', 'không mở được kết nối'); return; }
+  c.ws = ws;
+  let opened = false;
+  setState(c, 'wait', 'đang kết nối');
+  ws.onopen = () => {
+    opened = true;
+    ws.send(JSON.stringify({op:'subscribe', args:['orderbook.200.' + pair, 'publicTrade.' + pair]}));
+    c.timers.push(setInterval(() => { try{ ws.send(JSON.stringify({op:'ping'})); }catch(e){} }, 20000));
+  };
+  ws.onmessage = e => {
+    if (g !== gen) return;
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    if (d.ret_msg === 'pong' || d.op === 'pong'){ c.lastMsg = Date.now(); return; }
+    if (d.success === false && d.op === 'subscribe'){
+      clearConn(c);
+      startBybit(sym, g, vi + 1);
+      return;
+    }
+    if (!d.topic || !d.data) return;
+    c.lastMsg = Date.now();
+    if (d.topic.indexOf('publicTrade') === 0){
+      for (const t of d.data)
+        pushTrade((t.S === 'Buy' ? 1 : -1) * parseFloat(t.p) * c.pMul * parseFloat(t.v) * c.qMul);
+      return;
+    }
+    if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
+    const snap = d.type === 'snapshot';
+    applySide(c.bids, d.data.b || [], snap);
+    applySide(c.asks, d.data.a || [], snap);
+  };
+  ws.onclose = () => {
+    if (g !== gen || c.ws !== ws) return;
+    scheduleRetry(c, g, () => startBybit(sym, g, vi));
+  };
+  c.timers.push(setTimeout(() => {
+    if (g !== gen || c.ws !== ws || c.lastMsg) return;
+    clearConn(c);
+    if (!opened) scheduleRetry(c, g, () => startBybit(sym, g, vi), 'mạng chậm — thử lại sau 3s');
+    else startBybit(sym, g, vi + 1);
+  }, 6000));
+}
+
+/* ---------- OKX (USDT swap) — khối lượng tính theo HỢP ĐỒNG, cần nhân ctVal ---------- */
+async function startOkx(sym, g){
+  const c = conns.okx;
+  clearConn(c);
+  const inst = sym + '-USDT-SWAP';
+  setState(c, 'wait', 'đang lấy thông tin hợp đồng');
+  let ctVal = 1;
+  try {
+    const r = await fetch('https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=' + inst);
+    const j = await r.json();
+    if (!j.data || !j.data.length){
+      if (g === gen) setState(c, 'off', 'không có cặp này');
+      return;
+    }
+    ctVal = parseFloat(j.data[0].ctVal) || 1;
+  } catch(e){
+    if (g === gen) scheduleRetry(c, g, () => startOkx(sym, g), 'lỗi mạng khi lấy hệ số hợp đồng — thử lại sau 3s');
+    return;
+  }
+  if (g !== gen) return;
+  c.qMul = ctVal;
+  if (ctVal !== 1) c.variant = '×' + ctVal;
+  let ws;
+  try { ws = new WebSocket('wss://ws.okx.com:8443/ws/v5/public'); }
+  catch(e){ setState(c, 'off', 'không mở được kết nối'); return; }
+  c.ws = ws;
+  setState(c, 'wait', 'đang kết nối');
+  ws.onopen = () => {
+    ws.send(JSON.stringify({op:'subscribe', args:[{channel:'books', instId:inst}, {channel:'trades', instId:inst}]}));
+    c.timers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
+  };
+  ws.onmessage = e => {
+    if (g !== gen) return;
+    if (e.data === 'pong'){ c.lastMsg = Date.now(); return; }
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    if (d.event === 'error'){ setState(c, 'off', 'sàn báo lỗi: ' + (d.msg || d.code)); clearConn(c); return; }
+    if (!d.data || !d.arg) return;
+    c.lastMsg = Date.now();
+    if (d.arg.channel === 'trades'){
+      for (const t of d.data)
+        pushTrade((t.side === 'buy' ? 1 : -1) * parseFloat(t.px) * parseFloat(t.sz) * c.qMul);
+      return;
+    }
+    if (d.arg.channel !== 'books') return;
+    if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
+    const snap = d.action === 'snapshot';
+    const dd = d.data[0];
+    applySide(c.bids, dd.bids || [], snap);
+    applySide(c.asks, dd.asks || [], snap);
+  };
+  ws.onclose = () => {
+    if (g !== gen || c.ws !== ws) return;
+    scheduleRetry(c, g, () => startOkx(sym, g));
+  };
+}
+
+/* ---------- BITGET (USDT-FUTURES) — thử lần lượt các kiểu tên hợp đồng ---------- */
+const BITGET_VARIANTS = [
+  {pre: '',     m: 1,       tag: ''},
+  {pre: '1000', m: 1000,    tag: '1000×'},
+  {pre: '1M',   m: 1000000, tag: '1M×'},
+];
+function startBitget(sym, g, vi){
+  vi = vi || 0;
+  const c = conns.bitget;
+  clearConn(c);
+  if (vi >= BITGET_VARIANTS.length){ setState(c, 'off', 'không có cặp này'); return; }
+  const v = BITGET_VARIANTS[vi];
+  if (v.m !== 1){ c.variant = v.tag; c.pMul = 1 / v.m; c.qMul = v.m; }
+  const inst = v.pre + sym + 'USDT';
+  let ws;
+  try { ws = new WebSocket('wss://ws.bitget.com/v2/ws/public'); }
+  catch(e){ setState(c, 'off', 'không mở được kết nối'); return; }
+  c.ws = ws;
+  setState(c, 'wait', 'đang kết nối');
+  ws.onopen = () => {
+    ws.send(JSON.stringify({op:'subscribe', args:[
+      {instType:'USDT-FUTURES', channel:'books', instId:inst},
+      {instType:'USDT-FUTURES', channel:'trade', instId:inst}
+    ]}));
+    c.timers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
+  };
+  ws.onmessage = e => {
+    if (g !== gen) return;
+    if (e.data === 'pong'){ c.lastMsg = Date.now(); return; }
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    if (d.event === 'error'){ clearConn(c); startBitget(sym, g, vi + 1); return; }
+    if (!d.data || !d.data.length) return;
+    c.lastMsg = Date.now();
+    if (d.arg && d.arg.channel === 'trade'){
+      for (const t of d.data){
+        const px = parseFloat(t.price !== undefined ? t.price : t.px);
+        const sz = parseFloat(t.size !== undefined ? t.size : t.sz);
+        if (isFinite(px) && isFinite(sz))
+          pushTrade((t.side === 'buy' ? 1 : -1) * px * c.pMul * sz * c.qMul);
+      }
+      return;
+    }
+    if (!d.arg || d.arg.channel !== 'books') return;
+    if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
+    const snap = d.action === 'snapshot';
+    const dd = d.data[0];
+    applySide(c.bids, dd.bids || [], snap);
+    applySide(c.asks, dd.asks || [], snap);
+  };
+  ws.onclose = () => {
+    if (g !== gen || c.ws !== ws) return;
+    scheduleRetry(c, g, () => startBitget(sym, g, vi));
+  };
+}
+
+/* ==================================================================
+   MÁY PHÂN TÍCH KHUNG GIỜ
+   - dòng tiền đã khớp (gộp 4 sàn, chuẩn hóa USD, dấu + = mua chủ động)
+   - bộ theo dõi tường: tuổi, bài kiểm tra tiếp cận, xác nhận chéo sàn
+   - funding + OI (OKX REST) + thanh lý (Binance) + biên 4h (nến 15m)
+   - điểm tổng hợp 6 tín hiệu + nhật ký tự chấm điểm
+   ================================================================== */
+function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+function bitCount(x){ let n = 0; while (x){ n += x & 1; x >>= 1; } return n; }
+
+let flowSec = [];   /* dòng tiền khớp gộp theo giây: {t(giây), n(USD có dấu)} */
+let liqs = [];      /* thanh lý: {t, side:'long'|'short', n} */
+let midHist = [];   /* lịch sử giá giữa: {t, p} */
+let engineStart = 0;
+let predTimers = [];
+
+function pushTrade(n){
+  if (!isFinite(n)) return;
+  const s = Math.floor(Date.now() / 1000);
+  const last = flowSec[flowSec.length - 1];
+  if (last && last.t === s) last.n += n;
+  else flowSec.push({t: s, n});
+}
+function pushLiq(side, n){ liqs.push({t: Date.now(), side, n}); }
+
+function flowStats(){
+  const now = Math.floor(Date.now() / 1000);
+  while (flowSec.length && now - flowSec[0].t > 7200) flowSec.shift();
+  let f5 = 0, f30 = 0;
+  for (const x of flowSec){
+    const age = now - x.t;
+    if (age <= 300) f5 += x.n;
+    if (age <= 1800) f30 += x.n;
+  }
+  return {f5, f30};
+}
+function liqStats(){
+  const now = Date.now();
+  while (liqs.length && now - liqs[0].t > 1800e3) liqs.shift();
+  let L = 0, S = 0;
+  for (const x of liqs) if (now - x.t <= 300e3){ if (x.side === 'long') L += x.n; else S += x.n; }
+  return {L, S};
+}
+
+/* ---- bộ theo dõi tường (lọc lệnh ảo) ---- */
+let wallBook = {}, wallSym = '', lastPersist = 0;
+function loadEngineState(sym){
+  wallSym = sym;
+  try{ wallBook = JSON.parse(localStorage.getItem('walls_' + sym)) || {}; }catch(e){ wallBook = {}; }
+  try{ predLog = JSON.parse(localStorage.getItem('plog_' + sym)) || []; }catch(e){ predLog = []; }
+}
+function persistEngine(){
+  try{
+    localStorage.setItem('walls_' + wallSym, JSON.stringify(wallBook));
+    localStorage.setItem('plog_' + wallSym, JSON.stringify(predLog.slice(-100)));
+  }catch(e){}
+}
+function wallKey(side, p){ return side + ':' + p.toPrecision(5); }
+function updateWalls(A){
+  if (!A) return;
+  const now = Date.now();
+  const track = (rows, side) => {
+    if (!rows.length) return;
+    const th = 0.25 * Math.max(...rows.map(r => r.m));
+    for (const r of rows){
+      if (r.m < th) continue;
+      const key = wallKey(side, r.p);
+      const w = wallBook[key] || (wallBook[key] = {f: now, sv: 0, pl: 0, mx: 0, cx: 0});
+      w.l = now; w.cur = r.m;
+      w.mx = Math.max(w.mx, r.m);
+      w.cx = Math.max(w.cx, bitCount(r.ex || 0));
+      const dist = Math.abs(A.mid - r.p) / A.mid;
+      if (dist < 0.0015) w.near = true;
+      else if (dist > 0.004 && w.near){
+        w.near = false;
+        if (w.cur > 0.5 * w.mx) w.sv++;   /* giá áp sát rồi rời đi mà tường còn → sống sót */
+      }
+    }
+  };
+  track(A.bids, 'b'); track(A.asks, 'a');
+  /* tường biến mất ĐÚNG LÚC giá đang áp sát → lệnh ảo */
+  for (const key in wallBook){
+    const w = wallBook[key];
+    if (w.near && w.l && now - w.l > 4000){ w.pl++; w.near = false; }
+    if (w.l && now - w.l > 24 * 3600e3) delete wallBook[key];
+  }
+}
+function wallTrust(side, p){
+  const w = wallBook[wallKey(side, p)];
+  if (!w) return 30;
+  const ageMin = ((w.l || w.f) - w.f) / 60000;
+  let s = 30 + Math.min(30, ageMin * 1.5) + w.sv * 15 - w.pl * 30
+        + (w.cx >= 2 ? 10 : 0) + (w.cx >= 3 ? 5 : 0);
+  return clamp(Math.round(s), 0, 100);
+}
+function wallInfo(side, p){
+  const w = wallBook[wallKey(side, p)];
+  if (!w) return '';
+  const age = Math.round(((w.l || w.f) - w.f) / 60000);
+  let t = `sống ${age}'`;
+  if (w.sv) t += ` · chịu ${w.sv} lần chạm`;
+  if (w.pl) t += ` · ${w.pl} lần rút`;
+  return t;
+}
+
+/* ---- funding / OI / biên 4h (OKX REST — CORS đã kiểm chứng) ---- */
+let market = {funding: null, oi: null, oiHist: [], atr4h: null};
+async function pollMarket(sym, g){
+  const inst = sym + '-USDT-SWAP';
+  try{
+    const [fr, oi] = await Promise.all([
+      fetch('https://www.okx.com/api/v5/public/funding-rate?instId=' + inst).then(r => r.json()),
+      fetch('https://www.okx.com/api/v5/public/open-interest?instId=' + inst).then(r => r.json()),
+    ]);
+    if (g !== gen) return;
+    if (fr.data && fr.data[0]) market.funding = parseFloat(fr.data[0].fundingRate);
+    if (oi.data && oi.data[0]){
+      const v = parseFloat(oi.data[0].oiCcy || oi.data[0].oi);
+      if (isFinite(v)){
+        market.oi = v;
+        market.oiHist.push({t: Date.now(), v});
+        if (market.oiHist.length > 240) market.oiHist.shift();
+      }
+    }
+  }catch(e){}
+}
+async function pollCandles(sym, g){
+  try{
+    const j = await fetch('https://www.okx.com/api/v5/market/candles?instId=' + sym + '-USDT-SWAP&bar=15m&limit=96').then(r => r.json());
+    if (g !== gen || !j.data || j.data.length < 16) return;
+    const D = j.data;   /* nến 15m, MỚI NHẤT trước */
+    /* biên dao động điển hình (trung vị) của cửa sổ n nến */
+    const med = n => {
+      const rs = [];
+      for (let i = 0; i + n <= D.length; i += Math.max(1, Math.floor(n / 2))){
+        let hi = -Infinity, lo = Infinity;
+        for (let k = i; k < i + n; k++){
+          hi = Math.max(hi, parseFloat(D[k][2]));
+          lo = Math.min(lo, parseFloat(D[k][3]));
+        }
+        if (lo > 0) rs.push((hi - lo) / lo);
+      }
+      rs.sort((a, b) => a - b);
+      return rs.length ? rs[Math.floor(rs.length / 2)] : null;
+    };
+    market.ranges = {h1: med(4), h2: med(8), h4: med(16)};
+    market.atr4h = market.ranges.h4;
+    /* giá đóng cửa tham chiếu để tính % biến động 1h / 4h / 24h */
+    const cl = i => (D[i] ? parseFloat(D[i][4]) : null);
+    market.ref = {c1: cl(4), c4: cl(16), c24: cl(D.length - 1)};
+  }catch(e){}
+}
+
+/* ---- điểm tổng hợp + mục tiêu ---- */
+let pred = {ready: false};
+let predLog = [];
+function bestWall(rows, side, mid, cap, isBid){
+  let best = null, bs = 0;
+  for (const r of rows){
+    const d = isBid ? (mid - r.p) / mid : (r.p - mid) / mid;
+    if (d <= 0 || d > cap) continue;
+    const t = wallTrust(side, r.p);
+    const score = r.m * (t / 100) * (t >= 55 ? 1 : 0.3);
+    if (score > bs){ bs = score; best = {p: r.p, m: r.m, trust: t}; }
+  }
+  return best;
+}
+function analyze(A){
+  if (!A){ pred = {ready: false}; return; }
+  const mid = A.mid, now = Date.now();
+  midHist.push({t: now, p: mid});
+  while (midHist.length && now - midHist[0].t > 7200e3) midHist.shift();
+
+  const {f5, f30} = flowStats();
+  const {L, S: SL} = liqStats();
+  const bookM = A.bids.reduce((s, r) => s + r.m, 0) + A.asks.reduce((s, r) => s + r.m, 0);
+  const scale = Math.max(bookM, 1e5);
+
+  const sFlow30 = clamp(f30 / (scale * 0.05), -1, 1);
+  const sFlow5  = clamp(f5 / (scale * 0.015), -1, 1);
+
+  let tb = 0, ta = 0;
+  for (const r of A.bids){ if ((mid - r.p) / mid < 0.005) tb += r.m * wallTrust('b', r.p) / 100; }
+  for (const r of A.asks){ if ((r.p - mid) / mid < 0.005) ta += r.m * wallTrust('a', r.p) / 100; }
+  const sBook = (tb + ta) > 0 ? (tb - ta) / (tb + ta) : 0;
+
+  let sOi = 0;
+  if (market.oi && market.oiHist.length >= 3 && midHist.length >= 3){
+    const o0 = market.oiHist.find(x => now - x.t > 25 * 60e3);
+    const p0 = midHist.find(x => now - x.t > 25 * 60e3);
+    if (o0 && p0 && o0.v > 0 && p0.p > 0){
+      const dOi = (market.oi - o0.v) / o0.v, dP = (mid - p0.p) / p0.p;
+      if (Math.abs(dP) > 0.001 && Math.abs(dOi) > 0.002){
+        const mag = Math.min(1, Math.abs(dOi) / 0.02);
+        if (dP > 0) sOi = dOi > 0 ? mag : -0.4 * mag;
+        else sOi = dOi > 0 ? -mag : 0.4 * mag;
+      }
+    }
+  }
+  /* funding âm sâu = short đông nghẹt = nghiêng nguy cơ squeeze LÊN (ngược đám đông) */
+  const sFund = market.funding !== null ? clamp(-market.funding / 0.001, -1, 1) : 0;
+  /* thanh lý long = bán cưỡng bức đẩy XUỐNG; thanh lý short đẩy LÊN */
+  const sLiq = clamp((SL - L) / (scale * 0.01), -1, 1);
+
+  const S = 100 * (0.30 * sFlow30 + 0.15 * sFlow5 + 0.15 * sBook + 0.10 * sOi + 0.10 * sFund + 0.20 * sLiq);
+  const parts = [sFlow30, sFlow5, sBook, sOi, sFund, sLiq];
+  const act = parts.filter(x => Math.abs(x) > 0.15);
+  const agree = act.length ? act.filter(x => Math.sign(x) === Math.sign(S)).length / act.length : 0;
+  const conf = Math.round(clamp(38 + Math.abs(S) * 0.32 + agree * 22, 0, 80));
+
+  /* khung tự chọn theo độ nóng: coin chạy ≥3%/cửa sổ thì lấy cửa sổ ngắn nhất đủ nóng */
+  let frameH = 4, cap = market.atr4h || 0.03;
+  const R = market.ranges;
+  if (R && R.h1 !== null){
+    if (R.h1 >= 0.03){ frameH = 1; cap = R.h1; }
+    else if (R.h2 >= 0.03){ frameH = 2; cap = R.h2; }
+    else if (R.h4){ frameH = 4; cap = R.h4; }
+  }
+  const sup = bestWall(A.bids, 'b', mid, cap, true);
+  const res = bestWall(A.asks, 'a', mid, cap, false);
+
+  /* ETA: tiền (đã lọc tin cậy) chắn giữa giá và mục tiêu ÷ tốc độ dòng tiền */
+  let eta = null;
+  const rate = Math.abs(f30) / 30;
+  if (rate > 0 && Math.abs(S) >= 25){
+    const tgt = S < 0 ? sup : res;
+    if (tgt && ((S < 0 && f30 < 0) || (S > 0 && f30 > 0))){
+      let block = 0;
+      const rows = S < 0 ? A.bids : A.asks;
+      for (const r of rows){
+        const between = S < 0 ? (r.p >= tgt.p && r.p < mid) : (r.p <= tgt.p && r.p > mid);
+        if (between) block += r.m * wallTrust(S < 0 ? 'b' : 'a', r.p) / 100;
+      }
+      eta = Math.round(block / rate);
+    }
+  }
+
+  pred = {ready: true, S, conf, active: act.length, sup, res, cap, eta,
+          f5, f30, L, SL, mid, step: A.step, frameH, bookM};
+
+  /* nhật ký tự chấm: ghi khi có hướng, tối đa 1 lần / 5 phút hoặc khi đảo hướng */
+  if (Math.abs(S) >= 25 && act.length >= 2 && sup && res){
+    const lastE = predLog[predLog.length - 1];
+    const dir = Math.sign(S);
+    if (!lastE || lastE.hit !== null || now - lastE.t > 300e3 || lastE.dir !== dir){
+      if (!lastE || lastE.hit !== null || lastE.dir !== dir)
+        predLog.push({t: now, mid, dir, fh: frameH, tgt: dir > 0 ? res.p : sup.p, opp: dir > 0 ? sup.p : res.p, hit: null});
+    }
+  }
+  for (const e of predLog){
+    if (e.hit !== null) continue;
+    if (e.dir > 0){
+      if (mid >= e.tgt * 0.999) e.hit = true;
+      else if (mid <= e.opp * 1.001) e.hit = false;
+    } else {
+      if (mid <= e.tgt * 1.001) e.hit = true;
+      else if (mid >= e.opp * 0.999) e.hit = false;
+    }
+    if (e.hit === null && now - e.t > (e.fh || 4) * 3600e3) e.hit = false;
+  }
+  if (now - lastPersist > 30000){ lastPersist = now; persistEngine(); }
+}
+function selfScore(fh){
+  const done = predLog.filter(e => e.hit !== null && (e.fh || 4) === fh).slice(-20);
+  if (!done.length) return null;
+  return {hits: done.filter(e => e.hit).length, total: done.length};
+}
+function resetEngine(sym, g){
+  predTimers.forEach(clearInterval); predTimers = [];
+  flowSec = []; liqs = []; midHist = [];
+  market = {funding: null, oi: null, oiHist: [], atr4h: null};
+  pred = {ready: false};
+  engineStart = Date.now();
+  loadEngineState(sym);
+  pollMarket(sym, g); pollCandles(sym, g);
+  predTimers.push(setInterval(() => { if (g === gen) pollMarket(sym, g); }, 60000));
+  predTimers.push(setInterval(() => { if (g === gen) pollCandles(sym, g); }, 900000));
+}
+/* nhịp phân tích: 2 giây/lần */
+setInterval(() => { const A = aggregate(); updateWalls(A); analyze(A); }, 2000);
+
+/* ---------- GỘP & HIỂN THỊ ---------- */
+function niceStep(x){
+  if (!(x > 0)) return 0.0001;
+  const e = Math.floor(Math.log10(x));
+  const b = x / Math.pow(10, e);
+  const n = b <= 1 ? 1 : b <= 2 ? 2 : b <= 5 ? 5 : 10;
+  return n * Math.pow(10, e);
+}
+function fmtPrice(p, step){
+  const d = Math.min(12, Math.max(0, -Math.floor(Math.log10(step))));
+  return p.toFixed(d);
+}
+function fmtQty(x){
+  if (x >= 1e9) return (x/1e9).toFixed(2) + 'B';
+  if (x >= 1e6) return (x/1e6).toFixed(2) + 'M';
+  if (x >= 1e3) return (x/1e3).toFixed(1) + 'K';
+  if (x < 0.01) return x.toPrecision(2);
+  return x.toFixed(x < 10 ? 2 : 0);
+}
+function fmtMoney(x){ return '$' + Math.round(x).toLocaleString('en-US'); }
+
+function aggregate(){
+  /* chống sàn lệch hệ số: lấy sàn live đầu tiên (ưu tiên Binance) làm mốc,
+     sàn nào giá giữa lệch >15% so với mốc thì loại khỏi phép gộp */
+  let ref = null;
+  for (const e of EX){
+    const c = conns[e.key];
+    if (c.state !== 'live'){ c.exMid = null; continue; }
+    let b = -Infinity, a = Infinity;
+    for (const [p] of c.bids){ const pp = parseFloat(p) * c.pMul; if (pp > b) b = pp; }
+    for (const [p] of c.asks){ const pp = parseFloat(p) * c.pMul; if (pp < a) a = pp; }
+    c.exMid = (b > -Infinity && a < Infinity) ? (b + a) / 2 : (b > -Infinity ? b : (a < Infinity ? a : null));
+    if (ref === null && c.exMid !== null) ref = c.exMid;
+  }
+  for (const k in conns){
+    const c = conns[k];
+    c.excluded = c.state === 'live' && c.exMid !== null && ref !== null && Math.abs(c.exMid / ref - 1) > 0.15;
+  }
+
+  let bb = -Infinity, ba = Infinity;
+  const allB = [], allA = [];
+  for (const k in conns){
+    const c = conns[k];
+    if (c.state !== 'live' || c.excluded) continue;
+    for (const [p, q] of c.bids){
+      const pp = parseFloat(p) * c.pMul, qq = q * c.qMul;
+      if (!(qq > 0) || !(pp > 0)) continue;
+      allB.push([pp, qq, c.bit]);
+      if (pp > bb) bb = pp;
+    }
+    for (const [p, q] of c.asks){
+      const pp = parseFloat(p) * c.pMul, qq = q * c.qMul;
+      if (!(qq > 0) || !(pp > 0)) continue;
+      allA.push([pp, qq, c.bit]);
+      if (pp < ba) ba = pp;
+    }
+  }
+  if (!allB.length && !allA.length) return null;
+  const mid = (bb > -Infinity && ba < Infinity) ? (bb + ba) / 2 : (bb > -Infinity ? bb : ba);
+  /* bước giá tự điều chỉnh: phủ toàn bộ dải dữ liệu thật vào ~40 mốc (20 mỗi bên) */
+  let lo = Infinity, hi = -Infinity;
+  for (const [p] of allB){ if (p < lo) lo = p; }
+  for (const [p] of allA){ if (p > hi) hi = p; }
+  let span = (isFinite(lo) && isFinite(hi)) ? hi - lo : 0;
+  if (!(span > 0)) span = mid * 0.002;
+  const step = niceStep(span / 80);
+  const bMap = new Map(), aMap = new Map();
+  for (const [p, q, bit] of allB){
+    const key = Math.floor(p / step + 1e-9);
+    const o = bMap.get(key) || {q:0, m:0, ex:0};
+    o.q += q; o.m += p * q; o.ex |= bit;
+    bMap.set(key, o);
+  }
+  for (const [p, q, bit] of allA){
+    const key = Math.ceil(p / step - 1e-9);
+    const o = aMap.get(key) || {q:0, m:0, ex:0};
+    o.q += q; o.m += p * q; o.ex |= bit;
+    aMap.set(key, o);
+  }
+  /* không giới hạn số mốc: mốc nào có tiền treo là hiển thị hết */
+  const bids = [...bMap.entries()].sort((x, y) => y[0] - x[0])
+    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex}));
+  const asks = [...aMap.entries()].sort((x, y) => x[0] - y[0])
+    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex}));
+  return {bids, asks, mid, step};
+}
+
+function rowHtml(r, side, maxM, isWall, step){
+  const w = Math.max(1, Math.round(r.m / maxM * 100));
+  return `<div class="row ${side}">
+    <div class="p">${fmtPrice(r.p, step)}</div>
+    <div class="q">${fmtQty(r.q)}</div>
+    <div class="m">${fmtMoney(r.m)}</div>
+    <div class="barwrap"><div class="bar" style="width:${w}%"></div>${isWall ? '<span class="wl">← tường</span>' : ''}</div>
+  </div>`;
+}
+
+function render(){
+  const A = aggregate();
+  if (!A){
+    $('net').textContent = '—'; $('net').className = '';
+    $('buyT').textContent = '—'; $('sellT').textContent = '—';
+    $('asks').innerHTML = ''; $('bids').innerHTML = '';
+    $('midPrice').textContent = '—';
+    $('pLean').className = 'neutral';
+    $('pLean').textContent = '● Đang chờ dữ liệu…';
+    $('pGrid').style.display = 'none';
+    $('pBasis').textContent = '';
+    $('pAlert').style.display = 'none';
+    $('chg').textContent = '';
+    const anyTrying = Object.values(conns).some(c => c.state === 'wait');
+    $('empty').style.display = 'block';
+    $('empty').textContent = anyTrying ? 'Đang kết nối các sàn…' : 'Không sàn nào có cặp này — kiểm tra lại mã coin.';
+    return;
+  }
+  $('empty').style.display = 'none';
+
+  const buyM = A.bids.reduce((s, r) => s + r.m, 0);
+  const sellM = A.asks.reduce((s, r) => s + r.m, 0);
+  const net = buyM - sellM;
+  $('buyT').textContent = fmtMoney(buyM);
+  $('sellT').textContent = fmtMoney(sellM);
+  $('net').textContent = (net >= 0 ? '+' : '-') + fmtMoney(Math.abs(net)).slice(0);
+  $('net').className = net >= 0 ? 'pos' : 'neg';
+
+  const maxM = Math.max(1, ...A.bids.map(r => r.m), ...A.asks.map(r => r.m));
+  const wallA = A.asks.reduce((mx, r) => r.m > mx.m ? r : mx, {m:-1});
+  const wallB = A.bids.reduce((mx, r) => r.m > mx.m ? r : mx, {m:-1});
+
+  /* bên bán: mốc xa trên cùng, mốc sát giá ngay trên vạch giữa */
+  $('asks').innerHTML = A.asks.slice().reverse()
+    .map(r => rowHtml(r, 'ask', maxM, r === wallA, A.step)).join('');
+  $('bids').innerHTML = A.bids
+    .map(r => rowHtml(r, 'bid', maxM, r === wallB, A.step)).join('');
+  $('midPrice').textContent = fmtPrice(A.mid, A.step / 10);
+
+  /* dải % biến động — biết coin đang ở đoạn nào của cú pump/dump */
+  if (market.ref){
+    const one = (label, ref) => {
+      if (!ref || !(ref > 0)) return '';
+      const chg = (A.mid / ref - 1) * 100;
+      return `${label} <b class="${chg >= 0 ? 'up' : 'dn'}">${(chg >= 0 ? '+' : '') + chg.toFixed(1)}%</b>`;
+    };
+    $('chg').innerHTML = [one('1h', market.ref.c1), one('4h', market.ref.c4), one('24h', market.ref.c24)]
+      .filter(Boolean).join(' &nbsp;·&nbsp; ');
+  } else $('chg').textContent = '';
+
+  renderPredict(A, buyM, sellM, wallA, wallB);
+
+  /* đổi coin xong thì tự cuộn tới vạch giá hiện tại */
+  if (needScroll){
+    needScroll = false;
+    $('mid').scrollIntoView({block:'center'});
+  }
+}
+
+/* ---------- Ô NHẬN ĐỊNH ---------- */
+function fmtPct(x){ return (x >= 0 ? '+' : '') + x.toFixed(2) + '%'; }
+
+function tRow(label, price, pct, why){
+  return `<div class="prow"><div class="pl">${label}</div><div class="pp">${price}</div><div class="pc">${pct}</div><div class="pw">${why}</div></div>`;
+}
+
+function fmtSigned(x){ return (x >= 0 ? '+' : '-') + fmtMoney(Math.abs(x)); }
+
+function renderPredict(A, buyM, sellM, wallA, wallB){
+  const lean = $('pLean'), grid = $('pGrid');
+  const P = pred;
+  const warmLeft = Math.ceil((90000 - (Date.now() - engineStart)) / 1000);
+
+  /* dòng căn cứ + cảnh báo: luôn hiện số liệu thật đang đo */
+  let basis = '', alerts = [];
+  if (P.ready){
+    const sc = selfScore(P.frameH);
+    basis = `Khung ${P.frameH}h (tự chọn theo độ nóng) · Dòng tiền 30': ${fmtSigned(P.f30)} · 5': ${fmtSigned(P.f5)}`
+      + ` · funding ${market.funding !== null ? (market.funding * 100).toFixed(3) + '%/8h' : '—'}`
+      + ` · thanh lý 5': long ${fmtMoney(P.L)} / short ${fmtMoney(P.SL)}`
+      + ` · biên ${P.frameH}h ${P.cap ? '±' + (P.cap * 100).toFixed(1) + '%' : '—'}`
+      + (sc ? ` · máy tự chấm (${P.frameH}h): đúng ${sc.hits}/${sc.total}` : ` · máy tự chấm (${P.frameH}h): chưa đủ dữ liệu`);
+    if (market.funding !== null && Math.abs(market.funding) >= 0.0005){
+      const f = market.funding;
+      alerts.push(`⚠ Funding ${(f * 100).toFixed(3)}%/8h — phe ${f < 0 ? 'SHORT' : 'LONG'} đang đông nghẹt và trả phí, rủi ro squeeze ${f < 0 ? 'LÊN' : 'XUỐNG'} cao`);
+    }
+    if (P.bookM < 300000)
+      alerts.push(`⚠ Sổ lệnh mỏng (tổng ${fmtMoney(P.bookM)}) — coin dễ bị đạo diễn, mọi tín hiệu kém tin cậy`);
+  }
+  $('pBasis').textContent = basis;
+  $('pAlert').innerHTML = alerts.join('<br>');
+  $('pAlert').style.display = alerts.length ? '' : 'none';
+
+  if (!P.ready || warmLeft > 0){
+    lean.className = 'neutral';
+    lean.textContent = `● Đang thu thập dòng tiền để lọc lệnh ảo… ${warmLeft > 0 ? '(' + warmLeft + 's)' : ''}`;
+    grid.style.display = 'none';
+    return;
+  }
+
+  const nb = Math.max(1, Math.min(5, Math.round(P.conf / 20)));
+  const blocks = '█'.repeat(nb) + '░'.repeat(5 - nb);
+
+  if (Math.abs(P.S) < 25 || P.active < 2){
+    lean.className = 'neutral';
+    lean.innerHTML = '● CHƯA RÕ HƯỚNG — tín hiệu chưa đồng thuận, nên đứng ngoài'
+      + ` <span class="conf">điểm ${Math.round(P.S)}</span>`;
+    grid.style.display = 'none';
+    return;
+  }
+
+  const isLong = P.S > 0;
+  lean.className = isLong ? 'long' : 'short';
+  lean.innerHTML = (isLong ? '⬆ NGHIÊNG VỀ LONG' : '⬇ NGHIÊNG VỀ SHORT')
+    + ` <span class="conf">điểm ${Math.round(P.S)} · tin cậy ${blocks} ${P.conf}%</span>`;
+
+  const mid = P.mid, cap = P.cap;
+  let html = '';
+  if (P.res){
+    html += tRow('<span class="up">NẾU LONG ↗</span>&nbsp; vùng chốt',
+      fmtPrice(P.res.p, A.step), fmtPct((P.res.p / mid - 1) * 100),
+      `tường bán ${fmtMoney(P.res.m)} · tin ${P.res.trust}/100 · ${wallInfo('a', P.res.p)}`);
+  }
+  html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; trần ${P.frameH}h`,
+    fmtPrice(mid * (1 + cap), A.step), fmtPct(cap * 100),
+    `biên dao động ${P.frameH}h điển hình của coin này`);
+  html += '<div class="psep"></div>';
+  if (P.sup){
+    html += tRow('<span class="dn">NẾU SHORT ↘</span>&nbsp; vùng chốt',
+      fmtPrice(P.sup.p, A.step), fmtPct((P.sup.p / mid - 1) * 100),
+      `tường mua ${fmtMoney(P.sup.m)} · tin ${P.sup.trust}/100 · ${wallInfo('b', P.sup.p)}`);
+  }
+  html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sàn ${P.frameH}h`,
+    fmtPrice(mid * (1 - cap), A.step), fmtPct(-cap * 100),
+    `biên dao động ${P.frameH}h điển hình của coin này`);
+  if (P.eta !== null && P.eta >= 0 && P.eta < 600){
+    html += '<div class="psep"></div>';
+    html += tRow('⏱ ETA dòng tiền', P.eta + ' phút', '',
+      `chạm vùng ${isLong ? 'chốt long' : 'chốt short'} nếu giữ nhịp hiện tại`);
+  }
+  grid.innerHTML = html;
+  grid.style.display = '';
+}
+
+setInterval(render, 100);
+
+/* canh chừng: sàn đang live mà im lặng quá lâu (quá cả chu kỳ ping/pong) thì báo chờ */
+setInterval(() => {
+  const now = Date.now();
+  for (const k in conns){
+    const c = conns[k];
+    if (c.state === 'live' && now - c.lastMsg > 35000) setState(c, 'wait', 'mất dữ liệu — chờ nhận lại');
+  }
+}, 3000);
+
+let curSym = '';
+let needScroll = true;
+function start(force){
+  let sym = $('sym').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  sym = sym.replace(/USDT$/, '');
+  if (!sym) return;
+  if (!force && sym === curSym) return;
+  curSym = sym;
+  needScroll = true;
+  gen++;
+  const g = gen;
+  for (const k in conns) clearConn(conns[k]);
+  resetEngine(sym, g);
+  document.title = sym + ' — Sổ Lệnh Gộp';
+  startBinance(sym, g, false);
+  startBybit(sym, g, 0);
+  startOkx(sym, g);
+  startBitget(sym, g, 0);
+}
+
+/* gõ mã coin xong ngừng 0.6s là tự tìm; Enter tìm ngay */
+let typeTimer = null;
+$('sym').addEventListener('input', () => {
+  clearTimeout(typeTimer);
+  typeTimer = setTimeout(() => start(false), 600);
+});
+$('sym').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ clearTimeout(typeTimer); start(true); }
+});
+start(true);
+</script>
+</body>
+</html>
