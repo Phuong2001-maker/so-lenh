@@ -59,6 +59,7 @@ header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:
 .ask .bar{background:rgba(246,70,93,.38);}
 .bid .bar{background:rgba(14,203,129,.38);}
 .wl{position:absolute; right:2px; top:-1px; font-size:10px; color:var(--text); font-family:system-ui,sans-serif; opacity:.85;}
+.w1{color:#e2b93b;}
 #mid{display:flex; justify-content:center; align-items:baseline; gap:10px; padding:9px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:#0f1319; font-family:Consolas,monospace;}
 #mid span{color:var(--dim); font-size:11px; font-family:system-ui,sans-serif;}
 #midPrice{font-weight:700; font-size:17px;}
@@ -516,7 +517,11 @@ function wallTrust(side, p){
   const w = wallBook[wallKey(side, p)];
   if (!w) return 30;
   const ageMin = ((w.l || w.f) - w.f) / 60000;
-  let s = 30 + Math.min(30, ageMin * 1.5) + w.sv * 15 + (w.fl || 0) * 8 - Math.min(w.pl, 3) * 30
+  /* tường CHƯA từng bị giá thử (chưa chịu chạm, chưa bị khớp) thì "sống lâu"
+     chỉ được cộng nửa điểm — treo lệnh ảo ở xa giá chẳng tốn gì */
+  const tested = w.sv > 0 || (w.fl || 0) > 0;
+  let s = 30 + Math.min(tested ? 30 : 15, ageMin * 1.5) + w.sv * 15 + (w.fl || 0) * 8
+        - Math.min(w.pl, 3) * 30
         + (w.cx >= 2 ? 10 : 0) + (w.cx >= 3 ? 5 : 0);
   return clamp(Math.round(s), 0, 100);
 }
@@ -598,7 +603,7 @@ function bestWall(rows, side, mid, cap, isBid){
     if (d <= 0 || d > cap) continue;
     const t = wallTrust(side, r.p);
     const score = r.m * (t / 100) * (t >= 55 ? 1 : 0.3);
-    if (score > bs){ bs = score; best = {p: r.p, m: r.m, trust: t}; }
+    if (score > bs){ bs = score; best = {p: r.p, m: r.m, trust: t, ex: r.ex || 0}; }
   }
   return best;
 }
@@ -865,11 +870,21 @@ function aggregate(){
 
 function rowHtml(r, side, maxM, isWall, step){
   const w = Math.max(1, Math.round(r.m / maxM * 100));
+  let tag = '';
+  if (isWall){
+    /* tường lớn chỉ có trên 1 sàn + chưa từng bị giá thử → nghi đạo cụ */
+    const wb = wallBook[wallKey(side === 'ask' ? 'a' : 'b', r.p)];
+    const tested = wb && (wb.sv > 0 || (wb.fl || 0) > 0);
+    const oneEx = bitCount(r.ex || 0) <= 1;
+    tag = (oneEx && !tested)
+      ? '<span class="wl w1">← tường ⚠1 sàn chưa thử</span>'
+      : '<span class="wl">← tường</span>';
+  }
   return `<div class="row ${side}">
     <div class="p">${fmtPrice(r.p, step)}</div>
     <div class="q">${fmtQty(r.q)}</div>
     <div class="m">${fmtMoney(r.m)}</div>
-    <div class="barwrap"><div class="bar" style="width:${w}%"></div>${isWall ? '<span class="wl">← tường</span>' : ''}</div>
+    <div class="barwrap"><div class="bar" style="width:${w}%"></div>${tag}</div>
   </div>`;
 }
 
@@ -995,7 +1010,8 @@ function renderPredict(A, buyM, sellM, wallA, wallB){
   if (P.res){
     html += tRow('<span class="up">NẾU LONG ↗</span>&nbsp; vùng chốt',
       fmtPrice(P.res.p, A.step), fmtPct((P.res.p / mid - 1) * 100),
-      `tường bán ${fmtMoney(P.res.m)} · tin ${P.res.trust}/100 · ${wallInfo('a', P.res.p)}`);
+      `tường bán ${fmtMoney(P.res.m)} · tin ${P.res.trust}/100 · ${wallInfo('a', P.res.p)}`
+      + (bitCount(P.res.ex || 0) <= 1 ? ' · <span class="w1">⚠ chỉ 1 sàn</span>' : ''));
   }
   html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; trần ${P.frameH}h`,
     fmtPrice(mid * (1 + cap), A.step), fmtPct(cap * 100),
@@ -1004,7 +1020,8 @@ function renderPredict(A, buyM, sellM, wallA, wallB){
   if (P.sup){
     html += tRow('<span class="dn">NẾU SHORT ↘</span>&nbsp; vùng chốt',
       fmtPrice(P.sup.p, A.step), fmtPct((P.sup.p / mid - 1) * 100),
-      `tường mua ${fmtMoney(P.sup.m)} · tin ${P.sup.trust}/100 · ${wallInfo('b', P.sup.p)}`);
+      `tường mua ${fmtMoney(P.sup.m)} · tin ${P.sup.trust}/100 · ${wallInfo('b', P.sup.p)}`
+      + (bitCount(P.sup.ex || 0) <= 1 ? ' · <span class="w1">⚠ chỉ 1 sàn</span>' : ''));
   }
   html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sàn ${P.frameH}h`,
     fmtPrice(mid * (1 - cap), A.step), fmtPct(-cap * 100),
