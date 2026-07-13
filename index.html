@@ -463,7 +463,9 @@ function updateWalls(A){
   const now = Date.now();
   /* ngưỡng "áp sát"/"rời xa" theo BƯỚC GIÁ — tự co giãn theo độ mịn của sổ
      (ngưỡng % cố định từng làm sổ dày như BTC bị chấm oan hàng loạt) */
-  const nearD = 3 * A.step, leaveD = 8 * A.step;
+  /* có trần % để coin sổ thưa (step bị thổi phồng bởi mốc rác xa) vẫn đo được "chịu chạm" */
+  const nearD = Math.min(3 * A.step, 0.005 * A.mid);
+  const leaveD = Math.min(8 * A.step, 0.012 * A.mid);
   const track = (rows, side) => {
     if (!rows.length) return;
     const th = 0.25 * Math.max(...rows.map(r => r.m));
