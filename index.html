@@ -15,6 +15,8 @@ body{background:var(--bg); color:var(--text); font:14px/1.45 system-ui,'Segoe UI
 header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
 #sym{background:var(--panel); border:1px solid var(--line); color:var(--text); font:700 16px Consolas,monospace; padding:8px 10px; border-radius:8px; width:130px; text-transform:uppercase;}
 #sym:focus{outline:1px solid #2b6cee;}
+#dlLog{background:var(--panel); border:1px solid var(--line); color:var(--dim); font-size:12px; padding:8px 12px; border-radius:8px; cursor:pointer; margin-left:auto;}
+#dlLog:hover{color:var(--text); border-color:#2b6cee;}
 #totalBlock{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; text-align:center; margin-bottom:12px;}
 #netLabel{color:var(--dim); font-size:12px; letter-spacing:1px;}
 #net{font:700 42px Consolas,monospace; margin:2px 0; color:var(--dim);}
@@ -68,6 +70,7 @@ footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
 
 <header>
   <input id="sym" value="BTC" placeholder="nhập mã coin" spellcheck="false">
+  <button id="dlLog" title="Tải toàn bộ nhật ký nhận định (mọi coin) ra file JSON để gửi phân tích">⬇ Log</button>
 </header>
 
 <div id="totalBlock">
@@ -624,7 +627,16 @@ function analyze(A){
     const dir = Math.sign(S);
     if (!lastE || lastE.hit !== null || now - lastE.t > 300e3 || lastE.dir !== dir){
       if (!lastE || lastE.hit !== null || lastE.dir !== dir)
-        predLog.push({t: now, mid, dir, fh: frameH, tgt: dir > 0 ? res.p : sup.p, opp: dir > 0 ? sup.p : res.p, hit: null});
+        predLog.push({
+          t: now, mid, dir, fh: frameH,
+          tgt: dir > 0 ? res.p : sup.p, opp: dir > 0 ? sup.p : res.p, hit: null,
+          /* hồ sơ tín hiệu lúc ra quyết định — để phân tích vì sao đúng/sai */
+          S: Math.round(S), conf,
+          sig: {f30: +sFlow30.toFixed(2), f5: +sFlow5.toFixed(2), bk: +sBook.toFixed(2),
+                oi: +sOi.toFixed(2), fu: +sFund.toFixed(2), lq: +sLiq.toFixed(2)},
+          bookM: Math.round(bookM), fund: market.funding,
+          cap: +cap.toFixed(4), supT: sup.trust, resT: res.trust
+        });
     }
   }
   for (const e of predLog){
@@ -636,7 +648,8 @@ function analyze(A){
       if (mid <= e.tgt * 1.001) e.hit = true;
       else if (mid >= e.opp * 0.999) e.hit = false;
     }
-    if (e.hit === null && now - e.t > (e.fh || 4) * 3600e3) e.hit = false;
+    if (e.hit === null && now - e.t > (e.fh || 4) * 3600e3){ e.hit = false; e.exp = true; }
+    if (e.hit !== null && !e.rt) e.rt = now;
   }
   if (now - lastPersist > 30000){ lastPersist = now; persistEngine(); }
 }
@@ -656,6 +669,37 @@ function resetEngine(sym, g){
   predTimers.push(setInterval(() => { if (g === gen) pollMarket(sym, g); }, 60000));
   predTimers.push(setInterval(() => { if (g === gen) pollCandles(sym, g); }, 900000));
 }
+/* ---- xuất nhật ký ra file JSON (tự mô tả cấu trúc, gom mọi coin) ---- */
+function exportLog(){
+  persistEngine();   /* chốt trạng thái đang có vào bộ nhớ trước khi gom */
+  const out = {
+    app: 'so-lenh', logVersion: 2,
+    exportedAt: new Date().toISOString(),
+    currentSymbol: curSym,
+    schema: {
+      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi',
+      walls: 'key = phía(b mua/a bán):giá · f=lần đầu thấy · l=lần cuối thấy · sv=số lần chịu được giá áp sát · pl=số lần rút khi giá áp sát (lệnh ảo) · mx=tiền lớn nhất từng treo · cx=số sàn cùng có tường'
+    },
+    coins: {}
+  };
+  for (let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    let m;
+    try{
+      if ((m = k.match(/^plog_(.+)$/)))
+        (out.coins[m[1]] = out.coins[m[1]] || {}).predictions = JSON.parse(localStorage.getItem(k));
+      else if ((m = k.match(/^walls_(.+)$/)))
+        (out.coins[m[1]] = out.coins[m[1]] || {}).walls = JSON.parse(localStorage.getItem(k));
+    }catch(e){}
+  }
+  const blob = new Blob([JSON.stringify(out, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'so-lenh-log-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 /* nhịp phân tích: 2 giây/lần */
 setInterval(() => { const A = aggregate(); updateWalls(A); analyze(A); }, 2000);
 
@@ -930,6 +974,8 @@ function start(force){
   startOkx(sym, g);
   startBitget(sym, g, 0);
 }
+
+$('dlLog').onclick = exportLog;
 
 /* gõ mã coin xong ngừng 0.6s là tự tìm; Enter tìm ngay */
 let typeTimer = null;
