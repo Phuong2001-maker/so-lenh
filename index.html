@@ -46,6 +46,20 @@ header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:
 .psep{border-top:1px solid var(--line); margin:6px 0;}
 #pBasis{color:var(--dim); font-size:12px; margin-top:8px;}
 #pWarn{color:var(--dim); font-size:11px; margin-top:3px; opacity:.8;}
+#topHunt{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
+#thHead{display:flex; align-items:baseline; gap:10px; font-weight:700; font-size:14px;}
+#thHead .note{color:var(--dim); font-weight:400; font-size:11px;}
+#thScore{margin-left:auto; font:700 20px Consolas,monospace; color:var(--dim);}
+#thScore.warm{color:#e2b93b;}
+#thScore.hot{color:var(--red);}
+#thList{margin-top:8px;}
+.thRow{font-size:12.5px; padding:1.5px 0; color:var(--dim);}
+.thRow.on{color:var(--text);}
+.thRow .dotOn{color:var(--red);}
+.thRow .dotOff{opacity:.45;}
+#thTgt{color:var(--text); font-size:12.5px; margin-top:8px; font-family:Consolas,monospace;}
+#thTgt .lbl{color:var(--dim); font-family:system-ui,sans-serif;}
+#thFund{color:var(--dim); font-size:12px; margin-top:4px;}
 #book{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
 .bhead{display:grid; grid-template-columns:110px 100px 120px 1fr; gap:8px; padding:8px 14px; color:var(--dim); font-size:12px; border-bottom:1px solid var(--line);}
 .bhead .q,.bhead .m{text-align:right;}
@@ -88,6 +102,13 @@ footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
   <div id="pAlert"></div>
   <div id="pBasis"></div>
   <div id="pWarn">⚠ Nhận định từ dữ liệu, không phải lời khuyên — tường rút là vô hiệu</div>
+</div>
+
+<div id="topHunt">
+  <div id="thHead">🎯 SĂN ĐỈNH <span class="note">cho kèo short khoảng dài — điểm cao = cú pump đang kiệt sức</span><span id="thScore">—</span></div>
+  <div id="thList"></div>
+  <div id="thTgt"></div>
+  <div id="thFund"></div>
 </div>
 
 <div id="book">
@@ -438,9 +459,12 @@ function flowStats(){
 function liqStats(){
   const now = Date.now();
   while (liqs.length && now - liqs[0].t > 1800e3) liqs.shift();
-  let L = 0, S = 0;
-  for (const x of liqs) if (now - x.t <= 300e3){ if (x.side === 'long') L += x.n; else S += x.n; }
-  return {L, S};
+  let L = 0, S = 0, L30 = 0, S30 = 0;
+  for (const x of liqs){
+    if (x.side === 'long') L30 += x.n; else S30 += x.n;
+    if (now - x.t <= 300e3){ if (x.side === 'long') L += x.n; else S += x.n; }
+  }
+  return {L, S, L30, S30};
 }
 
 /* ---- bộ theo dõi tường (lọc lệnh ảo) ---- */
@@ -568,9 +592,9 @@ async function pollMarket(sym, g){
 }
 async function pollCandles(sym, g){
   try{
-    const j = await fetch('https://www.okx.com/api/v5/market/candles?instId=' + sym + '-USDT-SWAP&bar=15m&limit=96').then(r => r.json());
+    const j = await fetch('https://www.okx.com/api/v5/market/candles?instId=' + sym + '-USDT-SWAP&bar=15m&limit=192').then(r => r.json());
     if (g !== gen || !j.data || j.data.length < 16) return;
-    const D = j.data;   /* nến 15m, MỚI NHẤT trước */
+    const D = j.data;   /* nến 15m, MỚI NHẤT trước (192 nến = 48h) */
     /* biên dao động điển hình (trung vị) của cửa sổ n nến */
     const med = n => {
       const rs = [];
@@ -589,7 +613,11 @@ async function pollCandles(sym, g){
     market.atr4h = market.ranges.h4;
     /* giá đóng cửa tham chiếu để tính % biến động 1h / 4h / 24h */
     const cl = i => (D[i] ? parseFloat(D[i][4]) : null);
-    market.ref = {c1: cl(4), c4: cl(16), c24: cl(D.length - 1)};
+    market.ref = {c1: cl(4), c4: cl(16), c24: cl(Math.min(96, D.length - 1))};
+    /* chân cú pump: đáy thấp nhất 48h — coin xì hơi rất hay quay về điểm xuất phát */
+    let lo = Infinity;
+    for (const k of D){ const l = parseFloat(k[3]); if (l > 0 && l < lo) lo = l; }
+    market.pumpLow = isFinite(lo) ? lo : null;
   }catch(e){}
 }
 
@@ -614,7 +642,7 @@ function analyze(A){
   while (midHist.length && now - midHist[0].t > 7200e3) midHist.shift();
 
   const {f5, f30} = flowStats();
-  const {L, S: SL} = liqStats();
+  const {L, S: SL, L30, S30} = liqStats();
   const bookM = A.bids.reduce((s, r) => s + r.m, 0) + A.asks.reduce((s, r) => s + r.m, 0);
   const scale = Math.max(bookM, 1e5);
 
@@ -627,21 +655,23 @@ function analyze(A){
   const sBook = (tb + ta) > 0 ? (tb - ta) / (tb + ta) : 0;
 
   let sOi = 0;
+  /* lấy mẫu GẦN mốc 25 phút nhất (phần tử mới nhất mà đã cũ hơn 25') —
+     find() từ đầu mảng từng lấy nhầm phần tử CŨ NHẤT (2-4 tiếng) làm lệch cả tín hiệu */
+  const pick25 = arr => {
+    for (let i = arr.length - 1; i >= 0; i--) if (now - arr[i].t > 25 * 60e3) return arr[i];
+    return null;
+  };
+  let dP25 = null, dOi25 = null;
   if (market.oi && market.oiHist.length >= 3 && midHist.length >= 3){
-    /* lấy mẫu GẦN mốc 25 phút nhất (phần tử mới nhất mà đã cũ hơn 25') —
-       find() từ đầu mảng từng lấy nhầm phần tử CŨ NHẤT (2-4 tiếng) làm lệch cả tín hiệu */
-    const pick25 = arr => {
-      for (let i = arr.length - 1; i >= 0; i--) if (now - arr[i].t > 25 * 60e3) return arr[i];
-      return null;
-    };
     const o0 = pick25(market.oiHist);
     const p0 = pick25(midHist);
     if (o0 && p0 && o0.v > 0 && p0.p > 0){
-      const dOi = (market.oi - o0.v) / o0.v, dP = (mid - p0.p) / p0.p;
-      if (Math.abs(dP) > 0.001 && Math.abs(dOi) > 0.002){
-        const mag = Math.min(1, Math.abs(dOi) / 0.02);
-        if (dP > 0) sOi = dOi > 0 ? mag : -0.4 * mag;
-        else sOi = dOi > 0 ? -mag : 0.4 * mag;
+      dOi25 = (market.oi - o0.v) / o0.v;
+      dP25 = (mid - p0.p) / p0.p;
+      if (Math.abs(dP25) > 0.001 && Math.abs(dOi25) > 0.002){
+        const mag = Math.min(1, Math.abs(dOi25) / 0.02);
+        if (dP25 > 0) sOi = dOi25 > 0 ? mag : -0.4 * mag;
+        else sOi = dOi25 > 0 ? -mag : 0.4 * mag;
       }
     }
   }
@@ -690,6 +720,61 @@ function analyze(A){
   pred = {ready: true, S, conf, active: act.length, sup, res, cap, eta,
           f5, f30, L, SL, mid, step: A.step, frameH, bookM};
 
+  /* ---- SĂN ĐỈNH: chấm mức kiệt sức của cú pump (cho kèo short khoảng dài) ---- */
+  let maxMid30 = -Infinity, maxMid10 = -Infinity;
+  for (const x of midHist){
+    const age = now - x.t;
+    if (age <= 30 * 60e3 && x.p > maxMid30) maxMid30 = x.p;
+    if (age <= 10 * 60e3 && x.p > maxMid10) maxMid10 = x.p;
+  }
+  const run24 = (market.ref && market.ref.c24 > 0) ? mid / market.ref.c24 - 1 : null;
+  const run4 = (market.ref && market.ref.c4 > 0) ? mid / market.ref.c4 - 1 : null;
+  const thItems = [];
+  let thScore = 0;
+  const thAdd = (on, w, label) => { thItems.push({on: !!on, label}); if (on) thScore += w; };
+  thAdd(isFinite(maxMid30) && mid >= maxMid30 * 0.998 && f30 > 0 && f5 < 0.4 * (f30 / 6), 25,
+    `hụt hơi: giá sát đỉnh 30' nhưng lực mua 5' (${fmtSigned(f5)}) tụt so với nhịp trước (${fmtSigned(f30 / 6)}/5')`);
+  thAdd(dP25 !== null && dP25 > 0.01 && dOi25 !== null && dOi25 < -0.005, 20,
+    `long cũ chốt lời: giá ${dP25 !== null ? '+' + (dP25 * 100).toFixed(1) : '?'}%/25' mà OI ${dOi25 !== null ? (dOi25 * 100).toFixed(1) : '?'}%`);
+  thAdd(f8 !== null && f8 >= 0.0005, 15,
+    `funding dương nóng${f8 !== null ? ' ≈' + (f8 * 100).toFixed(3) + '%/8h' : ''} — long đông nghẹt, thuận short`);
+  thAdd(res && res.trust >= 55 && (res.p - mid) / mid < 0.004 && sFlow5 >= 0.3
+    && isFinite(maxMid10) && mid <= maxMid10 * 1.0005, 20,
+    'hấp thụ: mua nện vào kháng cự tin cao mà giá không thủng lên được');
+  thAdd(S30 > 25000 && SL < S30 * 0.1, 10,
+    'đợt cháy short đã tắt — nhiên liệu đẩy lên cạn dần');
+  thAdd((run24 !== null && run24 >= 0.25) || (run4 !== null && cap && run4 >= 2 * cap), 10,
+    `giá chạy vượt xa biên thường (24h ${run24 !== null ? (run24 >= 0 ? '+' : '') + (run24 * 100).toFixed(0) + '%' : '—'})`);
+  /* mục tiêu chốt xa: đỡ lớn trong 15%, đỡ sâu hơn trong 25%, chân cú pump 48h */
+  const farSup = bestWall(A.bids, 'b', mid, 0.15, true);
+  let deepSup = null;
+  if (farSup){
+    let bs2 = 0;
+    for (const r of A.bids){
+      if (r.p >= farSup.p * 0.995) continue;
+      const d = (mid - r.p) / mid;
+      if (d <= 0 || d > 0.25) continue;
+      const t2 = wallTrust('b', r.p);
+      const sc2 = r.m * (t2 / 100);
+      if (sc2 > bs2){ bs2 = sc2; deepSup = {p: r.p, m: r.m, trust: t2}; }
+    }
+  }
+  pred.top = {score: Math.round(thScore), items: thItems, farSup, deepSup,
+    pumpLow: (market.pumpLow && market.pumpLow < mid * 0.97) ? market.pumpLow : null, f8};
+
+  /* ghi sổ kèo săn đỉnh (kind:'top', chấm riêng): điểm ≥70 → cược "giảm 1 biên khung
+     trước khi tăng thêm nửa biên", hạn 8h; tối đa 1 kèo mở + cách nhau ≥15 phút */
+  if (thScore >= 70 && cap){
+    const openTop = predLog.some(e => e.kind === 'top' && e.hit === null);
+    let lastTopT = 0;
+    for (const e of predLog) if (e.kind === 'top' && e.t > lastTopT) lastTopT = e.t;
+    if (!openTop && now - lastTopT > 900e3){
+      predLog.push({t: now, mid, dir: -1, kind: 'top', fh: 8, top: Math.round(thScore),
+        chk: thItems.map(i => i.on ? 1 : 0).join(''),
+        tgt: mid * (1 - cap), opp: mid * (1 + cap / 2), hit: null});
+    }
+  }
+
   /* nhật ký tự chấm: chỉ ghi khi mục tiêu đủ xa (≥0.2% — gần hơn thì phí ăn hết,
      vô giá trị) và cách lần ghi trước ≥60 giây (chống spam khi tín hiệu nhấp nháy) */
   if (Math.abs(S) >= 25 && act.length >= 2 && sup && res){
@@ -698,7 +783,10 @@ function analyze(A){
     const oppP = dir > 0 ? sup.p : res.p;
     const dist = Math.abs(tgtP - mid) / mid;
     const distO = Math.abs(oppP - mid) / mid;   /* mốc ngược cũng phải đủ xa — sát quá là thua oan vì nhiễu */
-    const lastE = predLog[predLog.length - 1];
+    let lastE = null;   /* bỏ qua kèo săn đỉnh — sổ hướng và sổ đỉnh độc lập nhau */
+    for (let i = predLog.length - 1; i >= 0; i--){
+      if (predLog[i].kind !== 'top'){ lastE = predLog[i]; break; }
+    }
     const spaced = !lastE || now - lastE.t > 60e3;
     const fresh = !lastE || lastE.hit !== null || lastE.dir !== dir;
     if (dist >= 0.002 && distO >= 0.002 && spaced && fresh){
@@ -732,7 +820,12 @@ function analyze(A){
   if (now - lastPersist > 30000){ lastPersist = now; persistEngine(); }
 }
 function selfScore(fh){
-  const done = predLog.filter(e => e.hit !== null && (e.fh || 4) === fh).slice(-20);
+  const done = predLog.filter(e => e.hit !== null && e.kind !== 'top' && (e.fh || 4) === fh).slice(-20);
+  if (!done.length) return null;
+  return {hits: done.filter(e => e.hit).length, total: done.length};
+}
+function selfScoreTop(){
+  const done = predLog.filter(e => e.kind === 'top' && e.hit !== null).slice(-20);
   if (!done.length) return null;
   return {hits: done.filter(e => e.hit).length, total: done.length};
 }
@@ -747,6 +840,38 @@ function resetEngine(sym, g){
   predTimers.push(setInterval(() => { if (g === gen) pollMarket(sym, g); }, 60000));
   predTimers.push(setInterval(() => { if (g === gen) pollCandles(sym, g); }, 900000));
 }
+/* ---- panel SĂN ĐỈNH ---- */
+function renderTop(){
+  const T = pred.top;
+  if (!pred.ready || !T){
+    $('thScore').textContent = '—'; $('thScore').className = '';
+    $('thList').innerHTML = '<div class="thRow">Đang thu thập dữ liệu (cần dòng tiền + nến 48h)…</div>';
+    $('thTgt').textContent = ''; $('thFund').textContent = '';
+    return;
+  }
+  $('thScore').textContent = T.score + '/100';
+  $('thScore').className = T.score >= 70 ? 'hot' : T.score >= 40 ? 'warm' : '';
+  $('thList').innerHTML = T.items.map(i =>
+    `<div class="thRow${i.on ? ' on' : ''}">${i.on ? '<span class="dotOn">●</span>' : '<span class="dotOff">○</span>'} ${i.label}</div>`
+  ).join('');
+  const mid = pred.mid;
+  const tgt = [];
+  if (T.farSup) tgt.push(`<span class="lbl">đỡ lớn</span> ${fmtPrice(T.farSup.p, pred.step)} (${fmtPct((T.farSup.p / mid - 1) * 100)}) · tin ${T.farSup.trust}`);
+  if (T.deepSup) tgt.push(`<span class="lbl">đỡ sâu</span> ${fmtPrice(T.deepSup.p, pred.step)} (${fmtPct((T.deepSup.p / mid - 1) * 100)})`);
+  if (T.pumpLow) tgt.push(`<span class="lbl">chân pump</span> ${fmtPrice(T.pumpLow, pred.step)} (${fmtPct((T.pumpLow / mid - 1) * 100)})`);
+  $('thTgt').innerHTML = tgt.length ? '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.join(' &nbsp;·&nbsp; ') : '';
+  let fundTxt = '';
+  if (T.f8 !== null && T.f8 !== undefined && isFinite(T.f8)){
+    const daily = T.f8 * 3 * 100;
+    fundTxt = T.f8 > 0
+      ? `Gồng short được NHẬN funding ≈ ${daily.toFixed(2)}%/ngày`
+      : `Gồng short TRẢ funding ≈ ${Math.abs(daily).toFixed(2)}%/ngày — tính vào giá vốn`;
+  }
+  const stc = selfScoreTop();
+  $('thFund').textContent = (fundTxt ? fundTxt + ' · ' : '')
+    + (stc ? `săn đỉnh tự chấm: đúng ${stc.hits}/${stc.total}` : 'săn đỉnh tự chấm: chưa đủ dữ liệu');
+}
+
 /* ---- xuất nhật ký ra file JSON (tự mô tả cấu trúc, gom mọi coin) ---- */
 function exportLog(){
   persistEngine();   /* chốt trạng thái đang có vào bộ nhớ trước khi gom */
@@ -755,7 +880,7 @@ function exportLog(){
     exportedAt: new Date().toISOString(),
     currentSymbol: curSym,
     schema: {
-      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi',
+      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) — chấm sổ TÁCH RIÊNG với kèo hướng',
       walls: 'key = phía(b mua/a bán):giá · f=lần đầu thấy · l=lần cuối thấy · sv=số lần chịu được giá áp sát · fl=số lần bị khớp thật (bị ăn mòn rồi hết — tiền thật) · pl=số lần rút khi giá áp sát (lệnh ảo) · mx=tiền lớn nhất từng treo · cx=số sàn cùng có tường · LƯU Ý: bản ghi trước logVersion 3 có thể bị chấm oan pl do ngưỡng cũ'
     },
     coins: {}
@@ -901,6 +1026,8 @@ function render(){
     $('pBasis').textContent = '';
     $('pAlert').style.display = 'none';
     $('chg').textContent = '';
+    $('thScore').textContent = '—'; $('thScore').className = '';
+    $('thList').innerHTML = ''; $('thTgt').textContent = ''; $('thFund').textContent = '';
     const anyTrying = Object.values(conns).some(c => c.state === 'wait');
     $('empty').style.display = 'block';
     $('empty').textContent = anyTrying ? 'Đang kết nối các sàn…' : 'Không sàn nào có cặp này — kiểm tra lại mã coin.';
@@ -939,6 +1066,7 @@ function render(){
   } else $('chg').textContent = '';
 
   renderPredict(A, buyM, sellM, wallA, wallB);
+  renderTop();
 
   /* đổi coin xong thì tự cuộn tới vạch giá hiện tại */
   if (needScroll){
