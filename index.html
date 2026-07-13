@@ -764,6 +764,18 @@ function analyze(A){
   pred.top = {score: Math.round(thScore), items: thItems, farSup, deepSup, entryRes,
     pumpLow: (market.pumpLow && market.pumpLow < mid * 0.97) ? market.pumpLow : null, f8};
 
+  /* ghi sổ "chạm vùng vào" (kind:'zone', chấm riêng): giá áp sát kháng cự tin cao
+     → cược "bật xuống nửa biên trước khi thủng tường +0.5%" — đo tỷ lệ win của vùng vào short */
+  if (entryRes && entryRes.trust >= 55 && cap && mid >= entryRes.p * 0.997 && mid < entryRes.p * 1.002){
+    const openZone = predLog.some(e => e.kind === 'zone' && e.hit === null);
+    let lastZoneT = 0;
+    for (const e of predLog) if (e.kind === 'zone' && e.t > lastZoneT) lastZoneT = e.t;
+    if (!openZone && now - lastZoneT > 1800e3){
+      predLog.push({t: now, mid, dir: -1, kind: 'zone', fh: frameH, wall: entryRes.p, wT: entryRes.trust,
+        tgt: mid * (1 - cap / 2), opp: entryRes.p * 1.005, hit: null});
+    }
+  }
+
   /* ghi sổ kèo săn đỉnh (kind:'top', chấm riêng): điểm ≥70 → cược "giảm 1 biên khung
      trước khi tăng thêm nửa biên", hạn 8h; tối đa 1 kèo mở + cách nhau ≥15 phút */
   if (thScore >= 70 && cap){
@@ -822,12 +834,17 @@ function analyze(A){
   if (now - lastPersist > 30000){ lastPersist = now; persistEngine(); }
 }
 function selfScore(fh){
-  const done = predLog.filter(e => e.hit !== null && e.kind !== 'top' && (e.fh || 4) === fh).slice(-20);
+  const done = predLog.filter(e => e.hit !== null && !e.kind && (e.fh || 4) === fh).slice(-20);
   if (!done.length) return null;
   return {hits: done.filter(e => e.hit).length, total: done.length};
 }
 function selfScoreTop(){
   const done = predLog.filter(e => e.kind === 'top' && e.hit !== null).slice(-20);
+  if (!done.length) return null;
+  return {hits: done.filter(e => e.hit).length, total: done.length};
+}
+function selfScoreZone(){
+  const done = predLog.filter(e => e.kind === 'zone' && e.hit !== null).slice(-20);
   if (!done.length) return null;
   return {hits: done.filter(e => e.hit).length, total: done.length};
 }
@@ -877,8 +894,10 @@ function renderTop(){
       : `Gồng short TRẢ funding ≈ ${Math.abs(daily).toFixed(2)}%/ngày — tính vào giá vốn`;
   }
   const stc = selfScoreTop();
+  const szc = selfScoreZone();
   $('thFund').textContent = (fundTxt ? fundTxt + ' · ' : '')
-    + (stc ? `săn đỉnh tự chấm: đúng ${stc.hits}/${stc.total}` : 'săn đỉnh tự chấm: chưa đủ dữ liệu');
+    + (stc ? `săn đỉnh tự chấm: đúng ${stc.hits}/${stc.total}` : 'săn đỉnh tự chấm: chưa đủ dữ liệu')
+    + (szc ? ` · vùng vào tự chấm: đúng ${szc.hits}/${szc.total}` : '');
 }
 
 /* ---- xuất nhật ký ra file JSON (tự mô tả cấu trúc, gom mọi coin) ---- */
@@ -889,7 +908,7 @@ function exportLog(){
     exportedAt: new Date().toISOString(),
     currentSymbol: curSym,
     schema: {
-      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) — chấm sổ TÁCH RIÊNG với kèo hướng',
+      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) · KIND="zone"=CHẠM VÙNG VÀO short (wall=giá tường kháng cự, wT=điểm tin lúc chạm, cược: bật xuống nửa biên trước khi thủng tường +0.5%) — mỗi kind chấm sổ TÁCH RIÊNG',
       walls: 'key = phía(b mua/a bán):giá · f=lần đầu thấy · l=lần cuối thấy · sv=số lần chịu được giá áp sát · fl=số lần bị khớp thật (bị ăn mòn rồi hết — tiền thật) · pl=số lần rút khi giá áp sát (lệnh ảo) · mx=tiền lớn nhất từng treo · cx=số sàn cùng có tường · LƯU Ý: bản ghi trước logVersion 3 có thể bị chấm oan pl do ngưỡng cũ'
     },
     coins: {}
