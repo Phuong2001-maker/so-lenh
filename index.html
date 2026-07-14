@@ -46,6 +46,13 @@ header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:
 .psep{border-top:1px solid var(--line); margin:6px 0;}
 #pBasis{color:var(--dim); font-size:12px; margin-top:8px;}
 #pWarn{color:var(--dim); font-size:11px; margin-top:3px; opacity:.8;}
+#lvlMap{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
+#lmHead{font-weight:700; font-size:14px;}
+#lmHead .note{color:var(--dim); font-weight:400; font-size:11px; margin-left:8px;}
+#lmAlert{font-size:12.5px; margin-top:6px;}
+#lmMid{color:var(--dim); font-size:11px; text-align:center; padding:4px 0;}
+.cUp{color:var(--green);}
+.cDn{color:var(--red);}
 #topHunt{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
 #thHead{display:flex; align-items:baseline; gap:10px; font-weight:700; font-size:14px;}
 #thHead .note{color:var(--dim); font-weight:400; font-size:11px;}
@@ -102,6 +109,14 @@ footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
   <div id="pAlert"></div>
   <div id="pBasis"></div>
   <div id="pWarn">⚠ Nhận định từ dữ liệu, không phải lời khuyên — tường rút là vô hiệu</div>
+</div>
+
+<div id="lvlMap">
+  <div id="lmHead">🧱 BẢN ĐỒ MỐC <span class="note">tường lớn hai phía — vượt mốc TRỐNG là chạy nhanh</span></div>
+  <div id="lmAlert" style="display:none"></div>
+  <div id="lmRes"></div>
+  <div id="lmMid"></div>
+  <div id="lmSup"></div>
 </div>
 
 <div id="topHunt">
@@ -470,6 +485,7 @@ function liqStats(){
 /* ---- bộ theo dõi tường (lọc lệnh ảo) ---- */
 let wallBook = {}, wallSym = '', lastPersist = 0;
 let thist = [], lastThistT = 0;   /* băng ghi điểm SĂN ĐỈNH theo phút */
+let lvlWatch = {}, brkAlert = null, lastMidForBrk = null;   /* theo dõi vượt mốc lớn */
 function loadEngineState(sym){
   wallSym = sym;
   try{ wallBook = JSON.parse(localStorage.getItem('walls_' + sym)) || {}; }catch(e){ wallBook = {}; }
@@ -651,6 +667,26 @@ function resolveFromCandles(D){
 /* ---- điểm tổng hợp + mục tiêu ---- */
 let pred = {ready: false};
 let predLog = [];
+/* chọn tối đa 3 tường mạnh nhất (tiền × tin) trong 15%, cách nhau ≥1.5% để không dính chùm */
+function pickLevels(rows, side, mid, isBid){
+  const cands = [];
+  for (const r of rows){
+    const d = isBid ? (mid - r.p) / mid : (r.p - mid) / mid;
+    if (d <= 0.001 || d > 0.15) continue;
+    const t = wallTrust(side, r.p);
+    cands.push({p: r.p, m: r.m, trust: t, d, ex: r.ex, score: r.m * (t / 100)});
+  }
+  cands.sort((a, b) => b.score - a.score);
+  const picked = [];
+  for (const c of cands){
+    if (picked.length >= 3) break;
+    if (picked.some(x => Math.abs(x.p - c.p) / mid < 0.015)) continue;
+    picked.push(c);
+  }
+  picked.sort((a, b) => a.d - b.d);
+  return picked;
+}
+
 function bestWall(rows, side, mid, cap, isBid){
   let best = null, bs = 0;
   for (const r of rows){
@@ -878,6 +914,65 @@ function analyze(A){
     } else pred.far = null;
   } else pred.far = null;
 
+  /* ---- BẢN ĐỒ MỐC: tường lớn hai phía + độ trống phía sau ---- */
+  const decorate = (arr, rows, isBid) => arr.map((L, i) => {
+    const nextP = arr[i + 1] ? arr[i + 1].p : null;
+    let gap = 0;
+    for (const r of rows){
+      const between = isBid ? (r.p < L.p && (nextP === null || r.p > nextP))
+                            : (r.p > L.p && (nextP === null || r.p < nextP));
+      if (between) gap += r.m;
+    }
+    const tgtP = nextP !== null ? nextP : mid * (isBid ? 0.85 : 1.15);
+    return {p: L.p, m: L.m, trust: L.trust, ex: L.ex, gap, thin: gap < 0.5 * L.m, tgtP};
+  });
+  pred.levels = {
+    res: decorate(pickLevels(A.asks, 'a', mid, false), A.asks, false),
+    sup: decorate(pickLevels(A.bids, 'b', mid, true), A.bids, true)
+  };
+
+  /* theo dõi VƯỢT mốc: phân biệt tường bị ĂN thật (vượt có lực) vs tường TỰ RÚT (bẫy) */
+  for (const sideName of ['res', 'sup']){
+    const ab = sideName === 'res' ? 'a' : 'b';
+    for (const L of pred.levels[sideName]){
+      const key = ab + ':' + L.p.toPrecision(6);
+      if (!lvlWatch[key]){
+        const w = wallBook[wallKey(ab, L.p)] || {};
+        lvlWatch[key] = {p: L.p, ab, m: L.m, thin: L.thin, tgtP: L.tgtP,
+                         fl0: w.fl || 0, pl0: w.pl || 0};
+      }
+      lvlWatch[key].seen = now;
+    }
+  }
+  if (lastMidForBrk !== null){
+    for (const key in lvlWatch){
+      const W = lvlWatch[key];
+      const up = W.ab === 'a';
+      const crossed = up ? (lastMidForBrk <= W.p && mid > W.p * 1.001)
+                         : (lastMidForBrk >= W.p && mid < W.p * 0.999);
+      if (crossed){
+        const w = wallBook[wallKey(W.ab, W.p)];
+        const dFl = w ? (w.fl || 0) - W.fl0 : 0;
+        const dPl = w ? (w.pl || 0) - W.pl0 : 0;
+        const clean = dFl > 0 && dPl === 0 ? true : (dPl > 0 ? false : null);
+        brkAlert = {t: now, warn: clean === false,
+          txt: (up ? '⚡ Vừa VƯỢT kháng cự ' : '⚡ Vừa THỦNG đỡ ') + fmtPrice(W.p, A.step)
+            + (clean === true ? ' — tường bị ĂN bằng tiền thật → cú vượt có lực'
+               : clean === false ? ' — tường TỰ RÚT trước khi giá tới → coi chừng bẫy'
+               : ' — chưa rõ tường bị ăn hay rút')};
+        /* mốc TRỐNG bị vượt → ghi sổ cược "chạy tới mốc kế tiếp" (kind:brk, chấm riêng) */
+        if (W.thin && !predLog.some(e => e.kind === 'brk' && e.hit === null)){
+          const dirB = up ? 1 : -1;
+          predLog.push({t: now, mid, dir: dirB, kind: 'brk', fh: 8,
+            tgt: W.tgtP, opp: W.p * (1 - dirB * 0.005), hit: null,
+            wall: W.p, clean});
+        }
+        delete lvlWatch[key];
+      } else if (now - (W.seen || 0) > 600e3) delete lvlWatch[key];
+    }
+  }
+  lastMidForBrk = mid;
+
   /* chấm sổ: phải CHẠM HẲN mục tiêu (không có vùng du di — du di từng gây thắng giả) */
   for (const e of predLog){
     if (e.hit !== null) continue;
@@ -918,11 +1013,46 @@ function selfScoreFar(){
   if (!done.length) return null;
   return {hits: done.filter(e => e.hit === true).length, total: done.length};
 }
+function selfScoreBrk(){
+  const done = predLog.filter(e => e.kind === 'brk' && typeof e.hit === 'boolean').slice(-20);
+  if (!done.length) return null;
+  return {hits: done.filter(e => e.hit === true).length, total: done.length};
+}
+
+/* ---- panel BẢN ĐỒ MỐC ---- */
+function renderLvl(){
+  const P = pred;
+  if (!P.ready || !P.levels){
+    $('lmRes').innerHTML = '<div class="thRow">Đang thu thập dữ liệu…</div>';
+    $('lmSup').innerHTML = ''; $('lmMid').textContent = '';
+    $('lmAlert').style.display = 'none';
+    return;
+  }
+  const row = (L, i, isRes) => {
+    const name = (isRes ? 'KHÁNG CỰ ' : 'ĐỠ ') + (i + 1);
+    const run = L.thin
+      ? ` — ${isRes ? 'vượt' : 'thủng'} → <b class="w1">TRỐNG</b> tới ${fmtPrice(L.tgtP, P.step)} (${fmtPct((L.tgtP / P.mid - 1) * 100)})`
+      : ` — sau lưng còn ${fmtMoney(L.gap)} chắn`;
+    return `<div class="thRow on"><span class="${isRes ? 'cDn' : 'cUp'}">${name}</span> · <b>${fmtPrice(L.p, P.step)}</b> (${fmtPct((L.p / P.mid - 1) * 100)}) · ${fmtMoney(L.m)} · tin ${L.trust}${bitCount(L.ex || 0) <= 1 ? ' · <span class="w1">⚠1 sàn</span>' : ''}${run}</div>`;
+  };
+  $('lmRes').innerHTML = P.levels.res.map((L, i) => ({L, i})).reverse()
+    .map(x => row(x.L, x.i, true)).join('');
+  $('lmSup').innerHTML = P.levels.sup.map((L, i) => row(L, i, false)).join('');
+  $('lmMid').textContent = `── giá hiện tại ${fmtPrice(P.mid, P.step / 10)} ──`;
+  let alertHtml = '';
+  if (brkAlert && Date.now() - brkAlert.t < 600e3)
+    alertHtml = `<div class="${brkAlert.warn ? 'w1' : 'cUp'}">${brkAlert.txt}</div>`;
+  const sb = selfScoreBrk();
+  if (sb) alertHtml += `<div style="color:var(--dim)">vượt-mốc tự chấm: đúng ${sb.hits}/${sb.total}</div>`;
+  $('lmAlert').innerHTML = alertHtml;
+  $('lmAlert').style.display = alertHtml ? '' : 'none';
+}
 function resetEngine(sym, g){
   predTimers.forEach(clearInterval); predTimers = [];
   flowSec = []; liqs = []; midHist = [];
   market = {funding: null, fundH: 8, oi: null, oiHist: [], atr4h: null};
   pred = {ready: false};
+  lvlWatch = {}; brkAlert = null; lastMidForBrk = null;
   engineStart = Date.now();
   loadEngineState(sym);
   pollMarket(sym, g); pollCandles(sym, g);
@@ -978,7 +1108,7 @@ function exportLog(){
     exportedAt: new Date().toISOString(),
     currentSymbol: curSym,
     schema: {
-      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ/"void"=hủy (kèo bị bỏ rơi khi đổi coin, chấm hồi tố bằng nến 15m nhưng cả tgt lẫn opp nằm trong cùng 1 nến nên không phân định — không tính vào tỷ lệ) · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) · KIND="zone"=CHẠM VÙNG VÀO short (wall=giá tường kháng cự, wT=điểm tin lúc chạm, cược: bật xuống nửa biên trước khi thủng tường +0.5%) · KIND="far"=kèo TẦM XA (tgt=tường lớn trong 12% cùng hướng máy nghiêng, cách ≥3%, opp=nửa đường ngược lại tức ăn-2-thua-1, hạn 24h, wT=tin tường mục tiêu) — mỗi kind chấm sổ TÁCH RIÊNG',
+      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ/"void"=hủy (kèo bị bỏ rơi khi đổi coin, chấm hồi tố bằng nến 15m nhưng cả tgt lẫn opp nằm trong cùng 1 nến nên không phân định — không tính vào tỷ lệ) · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) · KIND="zone"=CHẠM VÙNG VÀO short (wall=giá tường kháng cự, wT=điểm tin lúc chạm, cược: bật xuống nửa biên trước khi thủng tường +0.5%) · KIND="far"=kèo TẦM XA (tgt=tường lớn trong 12% cùng hướng máy nghiêng, cách ≥3%, opp=nửa đường ngược lại tức ăn-2-thua-1, hạn 24h, wT=tin tường mục tiêu) · KIND="brk"=VƯỢT MỐC TRỐNG (wall=mốc vừa vượt, clean: true=tường bị ăn thật/false=tường tự rút-bẫy/null=chưa rõ, cược: chạy tới tgt=mốc kế tiếp trước khi quay lại xuyên tường 0.5%, hạn 8h) — mỗi kind chấm sổ TÁCH RIÊNG',
       walls: 'key = phía(b mua/a bán):giá · f=lần đầu thấy · l=lần cuối thấy · sv=số lần chịu được giá áp sát · fl=số lần bị khớp thật (bị ăn mòn rồi hết — tiền thật) · pl=số lần rút khi giá áp sát (lệnh ảo) · mx=tiền lớn nhất từng treo · cx=số sàn cùng có tường · LƯU Ý: bản ghi trước logVersion 3 có thể bị chấm oan pl do ngưỡng cũ',
       topScoreHistory: 'điểm SĂN ĐỈNH lấy mẫu mỗi 60 giây: t=lúc đo (ms epoch), s=điểm 0-100 — dùng để hiệu chỉnh ngưỡng báo đỉnh bằng phân phối thật'
     },
@@ -1135,6 +1265,8 @@ function render(){
     $('chg').textContent = '';
     $('thScore').textContent = '—'; $('thScore').className = '';
     $('thList').innerHTML = ''; $('thTgt').textContent = ''; $('thFund').textContent = '';
+    $('lmRes').innerHTML = ''; $('lmSup').innerHTML = '';
+    $('lmMid').textContent = ''; $('lmAlert').style.display = 'none';
     const anyTrying = Object.values(conns).some(c => c.state === 'wait');
     $('empty').style.display = 'block';
     $('empty').textContent = anyTrying ? 'Đang kết nối các sàn…' : 'Không sàn nào có cặp này — kiểm tra lại mã coin.';
@@ -1173,6 +1305,7 @@ function render(){
   } else $('chg').textContent = '';
 
   renderPredict(A, buyM, sellM, wallA, wallB);
+  renderLvl();
   renderTop();
 
   /* đổi coin xong thì tự cuộn tới vạch giá hiện tại */
