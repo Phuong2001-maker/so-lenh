@@ -960,12 +960,13 @@ function analyze(A){
             + (clean === true ? ' — tường bị ĂN bằng tiền thật → cú vượt có lực'
                : clean === false ? ' — tường TỰ RÚT trước khi giá tới → coi chừng bẫy'
                : ' — chưa rõ tường bị ăn hay rút')};
-        /* mốc TRỐNG bị vượt → ghi sổ cược "chạy tới mốc kế tiếp" (kind:brk, chấm riêng) */
-        if (W.thin && !predLog.some(e => e.kind === 'brk' && e.hit === null)){
+        /* ghi sổ MỌI cú vượt mốc lớn (kind:brk) — cả mốc TRỐNG lẫn mốc còn chắn
+           (nhóm đối chứng, để đo được nhãn TRỐNG đáng tin bao nhiêu %) */
+        if (!predLog.some(e => e.kind === 'brk' && e.hit === null)){
           const dirB = up ? 1 : -1;
           predLog.push({t: now, mid, dir: dirB, kind: 'brk', fh: 8,
             tgt: W.tgtP, opp: W.p * (1 - dirB * 0.005), hit: null,
-            wall: W.p, clean});
+            wall: W.p, clean, thin: W.thin});
         }
         delete lvlWatch[key];
       } else if (now - (W.seen || 0) > 600e3) delete lvlWatch[key];
@@ -1108,7 +1109,7 @@ function exportLog(){
     exportedAt: new Date().toISOString(),
     currentSymbol: curSym,
     schema: {
-      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ/"void"=hủy (kèo bị bỏ rơi khi đổi coin, chấm hồi tố bằng nến 15m nhưng cả tgt lẫn opp nằm trong cùng 1 nến nên không phân định — không tính vào tỷ lệ) · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) · KIND="zone"=CHẠM VÙNG VÀO short (wall=giá tường kháng cự, wT=điểm tin lúc chạm, cược: bật xuống nửa biên trước khi thủng tường +0.5%) · KIND="far"=kèo TẦM XA (tgt=tường lớn trong 12% cùng hướng máy nghiêng, cách ≥3%, opp=nửa đường ngược lại tức ăn-2-thua-1, hạn 24h, wT=tin tường mục tiêu) · KIND="brk"=VƯỢT MỐC TRỐNG (wall=mốc vừa vượt, clean: true=tường bị ăn thật/false=tường tự rút-bẫy/null=chưa rõ, cược: chạy tới tgt=mốc kế tiếp trước khi quay lại xuyên tường 0.5%, hạn 8h) — mỗi kind chấm sổ TÁCH RIÊNG',
+      predictions: 't=lúc ghi (ms epoch) · mid=giá lúc ghi · dir: 1=long -1=short · fh=khung giờ · tgt=giá mục tiêu · opp=giá ngược (chạm trước là sai) · hit: true đúng/false sai/null đang chờ/"void"=hủy (kèo bị bỏ rơi khi đổi coin, chấm hồi tố bằng nến 15m nhưng cả tgt lẫn opp nằm trong cùng 1 nến nên không phân định — không tính vào tỷ lệ) · exp=true nếu sai do hết hạn chưa chạm · rt=lúc chốt sổ · S=điểm tổng hợp · conf=% tin cậy · sig={f30,f5:dòng tiền 30/5 phút, bk:sổ lệnh đã lọc, oi:OI, fu:funding ngược đám đông, lq:thanh lý} mỗi giá trị -1..1 · bookM=tổng tiền sổ USD · fund=funding rate/8h · cap=biên khung · supT/resT=điểm tin cậy tường đỡ/kháng lúc ghi · KIND="top"=kèo SĂN ĐỈNH (top=điểm đỉnh 0-100 lúc báo, chk=chuỗi 6 dấu hiệu bật/tắt, cược: giảm 1 biên khung trước khi tăng nửa biên, hạn 8h) · KIND="zone"=CHẠM VÙNG VÀO short (wall=giá tường kháng cự, wT=điểm tin lúc chạm, cược: bật xuống nửa biên trước khi thủng tường +0.5%) · KIND="far"=kèo TẦM XA (tgt=tường lớn trong 12% cùng hướng máy nghiêng, cách ≥3%, opp=nửa đường ngược lại tức ăn-2-thua-1, hạn 24h, wT=tin tường mục tiêu) · KIND="brk"=VƯỢT MỐC LỚN (wall=mốc vừa vượt, thin: true=sau lưng TRỐNG/false=còn tiền chắn (đối chứng), clean: true=tường bị ăn thật/false=tường tự rút-bẫy/null=chưa rõ, cược: chạy tới tgt=mốc kế tiếp trước khi quay lại xuyên tường 0.5%, hạn 8h) — mỗi kind chấm sổ TÁCH RIÊNG',
       walls: 'key = phía(b mua/a bán):giá · f=lần đầu thấy · l=lần cuối thấy · sv=số lần chịu được giá áp sát · fl=số lần bị khớp thật (bị ăn mòn rồi hết — tiền thật) · pl=số lần rút khi giá áp sát (lệnh ảo) · mx=tiền lớn nhất từng treo · cx=số sàn cùng có tường · LƯU Ý: bản ghi trước logVersion 3 có thể bị chấm oan pl do ngưỡng cũ',
       topScoreHistory: 'điểm SĂN ĐỈNH lấy mẫu mỗi 60 giây: t=lúc đo (ms epoch), s=điểm 0-100 — dùng để hiệu chỉnh ngưỡng báo đỉnh bằng phân phối thật'
     },
