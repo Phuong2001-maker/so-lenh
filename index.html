@@ -17,6 +17,19 @@ header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:
 #sym:focus{outline:1px solid #2b6cee;}
 #dlLog{background:var(--panel); border:1px solid var(--line); color:var(--dim); font-size:12px; padding:8px 12px; border-radius:8px; cursor:pointer; margin-left:auto;}
 #dlLog:hover{color:var(--text); border-color:#2b6cee;}
+#scan{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
+#scanHead{display:flex; align-items:center; gap:10px; font-weight:700; font-size:14px;}
+#scanHead .note{color:var(--dim); font-weight:400; font-size:11px;}
+#autoBtn{margin-left:auto; background:#173021; border:1px solid var(--green); color:var(--green); font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer;}
+#autoBtn.off{background:#1a1d23; border-color:var(--line); color:var(--dim);}
+#scanBody{display:flex; gap:18px; margin-top:8px; flex-wrap:wrap;}
+#scanUp, #scanDn{flex:1; min-width:280px;}
+.scanRow{display:flex; gap:8px; font:12.5px Consolas,monospace; padding:2px 6px; border-radius:5px; cursor:pointer; align-items:baseline;}
+.scanRow:hover{background:#1a1f27;}
+.scanRow.cur{background:#14202e; outline:1px solid #2b6cee;}
+.scanRow .s{font-weight:700; width:74px;}
+.scanRow .up{color:var(--green);} .scanRow .dn{color:var(--red);}
+.scanRow .v{color:var(--dim); margin-left:auto; font-size:11px;}
 #totalBlock{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; text-align:center; margin-bottom:12px;}
 #netLabel{color:var(--dim); font-size:12px; letter-spacing:1px;}
 #net{font:700 42px Consolas,monospace; margin:2px 0; color:var(--dim);}
@@ -94,6 +107,11 @@ footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
   <input id="sym" value="BTC" placeholder="nhập mã coin" spellcheck="false">
   <button id="dlLog" title="Tải toàn bộ nhật ký nhận định (mọi coin) ra file JSON để gửi phân tích">⬇ Log</button>
 </header>
+
+<div id="scan">
+  <div id="scanHead">📡 QUÉT OKX <span class="note">tự nạp coin nóng nhất vào phân tích — bấm dòng nào để xem tay coin đó</span><button id="autoBtn">TỰ ĐỘNG: BẬT</button></div>
+  <div id="scanBody"><div id="scanUp">Đang quét…</div><div id="scanDn"></div></div>
+</div>
 
 <div id="totalBlock">
   <div id="netLabel">TỔNG (TIỀN CHỜ MUA − TIỀN CHỜ BÁN)</div>
@@ -1467,9 +1485,95 @@ function start(force){
 
 $('dlLog').onclick = exportLog;
 
-/* gõ mã coin xong ngừng 0.6s là tự tìm; Enter tìm ngay */
+/* ==================================================================
+   MÁY QUÉT OKX — tự tìm coin tăng/giảm mạnh, tự nạp coin nóng nhất
+   vào phân tích (chế độ TỰ ĐỘNG), log tích lũy liên tục theo từng coin
+   ================================================================== */
+const scan = {rows: [], hist: {}, auto: true, lastSwitch: 0};
+
+function scanAutoOff(){
+  if (!scan.auto) return;
+  scan.auto = false;
+  updateAutoBtn();
+}
+function updateAutoBtn(){
+  const b = $('autoBtn');
+  b.textContent = scan.auto ? 'TỰ ĐỘNG: BẬT' : 'TỰ ĐỘNG: TẮT';
+  b.className = scan.auto ? '' : 'off';
+}
+$('autoBtn').onclick = () => { scan.auto = !scan.auto; scan.lastSwitch = 0; updateAutoBtn(); autoPick(); };
+
+async function pollScan(){
+  try{
+    const j = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP').then(r => r.json());
+    if (!j.data) return;
+    const now = Date.now();
+    const rows = [];
+    for (const t of j.data){
+      if (!t.instId.endsWith('-USDT-SWAP')) continue;
+      const last = parseFloat(t.last), open = parseFloat(t.open24h);
+      const volUsd = parseFloat(t.volCcy24h) * last;
+      if (!(last > 0) || !(open > 0) || !(volUsd > 200000)) continue;   /* bỏ coin chết thanh khoản */
+      const sym = t.instId.slice(0, -10);
+      const h = (scan.hist[sym] = scan.hist[sym] || []);
+      h.push({t: now, p: last});
+      while (h.length && now - h[0].t > 40 * 60e3) h.shift();
+      let chg15 = null;
+      for (let i = h.length - 1; i >= 0; i--){
+        if (now - h[i].t >= 15 * 60e3){ chg15 = last / h[i].p - 1; break; }
+      }
+      rows.push({sym, last, chg24: last / open - 1, chg15, volUsd,
+        heat: Math.abs(chg15 !== null ? chg15 : 0) * 6 + Math.abs(last / open - 1)});
+    }
+    scan.rows = rows;
+    renderScan();
+    autoPick();
+  }catch(e){}
+}
+
+/* tự nạp coin nóng nhất; chỉ đổi coin tối đa 15 phút/lần và khi con mới nóng hơn hẳn */
+function autoPick(){
+  if (!scan.auto || !scan.rows.length) return;
+  const now = Date.now();
+  if (now - scan.lastSwitch < 15 * 60e3) return;
+  const best = [...scan.rows].sort((a, b) => b.heat - a.heat)[0];
+  if (!best) return;
+  if (best.sym === curSym){ scan.lastSwitch = now; return; }
+  const cur = scan.rows.find(r => r.sym === curSym);
+  if (cur && best.heat < cur.heat * 1.5) return;
+  scan.lastSwitch = now;
+  $('sym').value = best.sym;
+  start(true);
+}
+
+function renderScan(){
+  const pct = x => (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
+  const volTxt = v => v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.round(v / 1e3) + 'K';
+  const row = r => `<div class="scanRow${r.sym === curSym ? ' cur' : ''}" data-s="${r.sym}">
+    <span class="s">${r.sym === curSym ? '▶ ' : ''}${r.sym}</span>
+    <span class="${r.chg24 >= 0 ? 'up' : 'dn'}">${pct(r.chg24)}</span>
+    <span class="${(r.chg15 || 0) >= 0 ? 'up' : 'dn'}">${r.chg15 !== null ? "15': " + pct(r.chg15) : ''}</span>
+    <span class="v">$${volTxt(r.volUsd)}</span></div>`;
+  const ups = [...scan.rows].filter(r => r.chg24 > 0).sort((a, b) => b.chg24 - a.chg24).slice(0, 5);
+  const dns = [...scan.rows].filter(r => r.chg24 < 0).sort((a, b) => a.chg24 - b.chg24).slice(0, 5);
+  $('scanUp').innerHTML = '<div style="color:var(--dim);font-size:11px">TOP TĂNG 24h</div>' + ups.map(row).join('');
+  $('scanDn').innerHTML = '<div style="color:var(--dim);font-size:11px">TOP GIẢM 24h</div>' + dns.map(row).join('');
+  document.querySelectorAll('.scanRow').forEach(el => {
+    el.onclick = () => {
+      scanAutoOff();                       /* bấm tay = tạm tắt tự động để không bị giật coin */
+      $('sym').value = el.dataset.s;
+      start(true);
+      renderScan();
+    };
+  });
+}
+setInterval(pollScan, 60000);
+pollScan();
+
+/* gõ mã coin xong ngừng 0.6s là tự tìm; Enter tìm ngay — gõ tay cũng tạm tắt tự động */
 let typeTimer = null;
 $('sym').addEventListener('input', () => {
+  scanAutoOff();
   clearTimeout(typeTimer);
   typeTimer = setTimeout(() => start(false), 600);
 });
