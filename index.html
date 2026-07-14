@@ -549,8 +549,20 @@ function updateWalls(A){
           if (zone >= 0.4 * w.mx){ delete wallBook[key]; rekeyed = true; }
         }
         if (!rekeyed){
-          if (w.cur >= 0.6 * w.mx) w.pl++;
-          else w.fl = (w.fl || 0) + 1;
+          const pulled = w.cur >= 0.6 * w.mx;
+          if (pulled) w.pl++; else w.fl = (w.fl || 0) + 1;
+          /* phân loại HỒI TỐ cho kèo vượt-mốc gần đây trên đúng tường này —
+             lúc vượt bộ đếm chưa kịp cập nhật nên 30/30 kèo từng bị "chưa rõ" */
+          for (const e of predLog){
+            if (e.kind === 'brk' && e.clean === null && e.wall && w.p !== undefined
+                && Math.abs(w.p - e.wall) / e.wall < 0.002 && now - e.t < 600e3){
+              e.clean = !pulled;
+              brkAlert = {t: now, warn: pulled,
+                txt: '⚡ Mốc ' + fmtPrice(e.wall, A.step) + (pulled
+                  ? ' — xác nhận tường TỰ RÚT → cú vượt là bẫy, coi chừng quật ngược'
+                  : ' — xác nhận tường bị ĂN thật → cú vượt có lực')};
+            }
+          }
         }
       }
     }
@@ -754,6 +766,10 @@ function analyze(A){
   /* dòng 5' ngược hẳn dòng 30' = thị trường đang đảo nhịp — mẫu này thua 60% (4/10) → đứng ngoài */
   const flowConflict = Math.sign(sFlow5) !== Math.sign(sFlow30)
     && Math.abs(sFlow5) > 0.3 && Math.abs(sFlow30) > 0.3;
+  /* CHỈNH #2 (gộp 3 vòng log: bão hòa 50% vs vừa 62%): dòng tiền kịch kim cả 2 khung
+     mà KHÔNG có sổ lệnh hoặc OI xác nhận cùng chiều → nghi đuổi đuôi cú chạy, đứng ngoài */
+  const satNoConfirm = satPen < 1
+    && !((sBook * Math.sign(S) >= 0.2) || (sOi * Math.sign(S) >= 0.2));
   const parts = [sFlow30, sFlow5, sBook, sOi, sFund, sLiq];
   const act = parts.filter(x => Math.abs(x) > 0.15);
   const agree = act.length ? act.filter(x => Math.sign(x) === Math.sign(S)).length / act.length : 0;
@@ -787,7 +803,7 @@ function analyze(A){
   }
 
   pred = {ready: true, S, conf, active: act.length, sup, res, cap, eta,
-          f5, f30, L, SL, mid, step: A.step, frameH, bookM, flowConflict};
+          f5, f30, L, SL, mid, step: A.step, frameH, bookM, flowConflict, satNoConfirm};
 
   /* ---- SĂN ĐỈNH: chấm mức kiệt sức của cú pump (cho kèo short khoảng dài) ---- */
   let maxMid30 = -Infinity, maxMid10 = -Infinity;
@@ -853,7 +869,7 @@ function analyze(A){
     thist.push({t: now, s: Math.round(thScore)});
     if (thist.length > 1440) thist.shift();
   }
-  if (thScore >= 60 && cap){
+  if (thScore >= 45 && cap){
     const openTop = predLog.some(e => e.kind === 'top' && e.hit === null);
     let lastTopT = 0;
     for (const e of predLog) if (e.kind === 'top' && e.t > lastTopT) lastTopT = e.t;
@@ -866,7 +882,7 @@ function analyze(A){
 
   /* nhật ký tự chấm: chỉ ghi khi mục tiêu đủ xa (≥0.2% — gần hơn thì phí ăn hết,
      vô giá trị) và cách lần ghi trước ≥60 giây (chống spam khi tín hiệu nhấp nháy) */
-  if (Math.abs(S) >= 25 && act.length >= 2 && sup && res && !flowConflict){
+  if (Math.abs(S) >= 25 && act.length >= 2 && sup && res && !flowConflict && !satNoConfirm){
     const dir = Math.sign(S);
     const tgtP = dir > 0 ? res.p : sup.p;
     const oppP = dir > 0 ? sup.p : res.p;
@@ -1070,7 +1086,9 @@ function renderTop(){
     return;
   }
   $('thScore').textContent = T.score + '/100';
-  $('thScore').className = T.score >= 70 ? 'hot' : T.score >= 40 ? 'warm' : '';
+  /* ngưỡng hiệu chỉnh theo băng ghi điểm thật: đèn funding/thanh lý gần như chết trên
+     coin nhỏ nên trần thực tế ~45-65 — đỏ từ 45, vàng từ 25 */
+  $('thScore').className = T.score >= 45 ? 'hot' : T.score >= 25 ? 'warm' : '';
   $('thList').innerHTML = T.items.map(i =>
     `<div class="thRow${i.on ? ' on' : ''}">${i.on ? '<span class="dotOn">●</span>' : '<span class="dotOff">○</span>'} ${i.label}</div>`
   ).join('');
@@ -1363,10 +1381,12 @@ function renderPredict(A, buyM, sellM, wallA, wallB){
   const nb = Math.max(1, Math.min(5, Math.round(P.conf / 20)));
   const blocks = '█'.repeat(nb) + '░'.repeat(5 - nb);
 
-  if (Math.abs(P.S) < 25 || P.active < 2 || P.flowConflict){
+  if (Math.abs(P.S) < 25 || P.active < 2 || P.flowConflict || P.satNoConfirm){
     lean.className = 'neutral';
     lean.innerHTML = (P.flowConflict
       ? `● CHƯA RÕ HƯỚNG — dòng tiền 5' đang NGƯỢC dòng 30' (thị trường đảo nhịp), đứng ngoài`
+      : P.satNoConfirm
+      ? `● CHƯA RÕ HƯỚNG — dòng tiền kịch kim nhưng sổ lệnh & OI không xác nhận (nghi đuổi đuôi cú chạy), đứng ngoài`
       : '● CHƯA RÕ HƯỚNG — tín hiệu chưa đồng thuận, nên đứng ngoài')
       + ` <span class="conf">điểm ${Math.round(P.S)}</span>`;
     grid.style.display = 'none';
