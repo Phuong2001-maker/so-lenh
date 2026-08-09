@@ -38,7 +38,9 @@ Mục đích: mở chat mới, AI đọc đúng file này là hiểu ngay dự �
 | Tải `php/` lên hosting | ✅ **xong, đã kiểm bằng curl thật** — xem bảng dưới |
 | Tên miền + bản ghi DNS | ✅ xong — `zewvir85` A → `103.75.186.15`, site addon PHP 8.1 đã tạo |
 | VIEW `v_keo` + ENUM `khong_khop` | ✅ đã Import lại SQL, `bao-cao.php` từ 500 → **200** |
-| **Cấp SSL Let's Encrypt** | ⛔ **CHƯA — đây là thứ duy nhất còn chặn**, vì `API_LOG` dùng `https://` |
+| Cấp SSL | ✅ **xong** — ZeroSSL, "SSL Tự động" nên tự gia hạn. Đã kiểm TLS bắt tay + cả 4 endpoint qua HTTPS |
+| CORS từ `file://` | ✅ preflight OPTIONS trả **204** với `access-control-allow-origin: null` |
+| **Mở app kiểm dòng dữ liệu thật** | ⛔ **việc tiếp theo — chưa có dòng nào trong bảng `keo`** |
 | Cron `cham.php` | ⏳ chưa |
 
 **Đã kiểm bằng `curl` thật qua HTTP (không suy đoán), chỉ có 4 file PHP + `.htaccess` trong `/domains/zewvir85.hiteckqualityconstruction.com.au/php/`:**
@@ -516,6 +518,23 @@ Commit gần nhất trước khi có file này: `5d4e6f7` (máy quét OKX + lãi
 ⚠ **Đánh số mục phải liên tục và mới nhất ở TRÊN.** Đã có một lần hai phiên làm việc song song
 cùng đánh số `(13)` và mục mới bị chèn xuống giữa file — đọc từ trên xuống thành ra sai thứ tự
 thời gian. Trước khi thêm mục, kiểm số lớn nhất bằng `grep -n "^- \*\*2026-" CLAUDE.md | head -3`.
+
+- **2026-08-10 (18)** — **Deploy xong hạ tầng, kiểm chứng đầu-cuối bằng `curl` thật.** Không đụng
+  code — toàn bộ là việc hạ tầng.
+  Bản ghi A `zewvir85 → 103.75.186.15` ở iNET, site addon PHP 8.1 trong 1Panel, 4 file PHP +
+  `.htaccess` vào `/domains/zewvir85.hiteckqualityconstruction.com.au/php/`, SSL ZeroSSL kiểu
+  "SSL Tự động". Xác nhận qua HTTPS: `ghi.php` 405 JSON sạch, `cham.php` 401, `bao-cao.php` 200,
+  `config.php` 403, và preflight OPTIONS trả **204** với `access-control-allow-origin: null` —
+  tức app mở bằng `file://` gọi được.
+  **Ba bẫy vận hành đã ghi vào mục trạng thái** (đừng dẫm lại): File Manager 1Panel ẩn file
+  `.ht*` nên tưởng chưa tải lên; chế độ **Skip** làm cả lô upload **dừng giữa đường** chỉ vì một
+  file đã tồn tại (lần đầu chỉ 2/5 file lên); và sửa `db/tao-database.sql` sau khi đã import thì
+  DB tụt lại — `bao-cao.php` trả **500 với thân trang RỖNG**, không có gì để lần vì hosting tắt
+  `display_errors`. Import lại là hết.
+  **Ghi lại phát hiện về hosting:** nó **chèn `<script src="/_osh/collect.js">` vào mọi phản hồi
+  HTML**. Đã kiểm là KHÔNG chèn vào `application/json`, nhưng thêm endpoint JSON mới thì phải
+  kiểm lại bằng `curl` chứ đừng tin.
+  Cũng ghi hai kỹ thuật kiểm không cần chờ DNS lan: `curl --resolve` và hỏi thẳng `ns1.inet.vn`.
 
 - **2026-08-09 (17)** — **Đổi đích deploy sang `zewvir85.hiteckqualityconstruction.com.au`.**
   Chỉ sửa 1 dòng `API_LOG` ở index.html, không đụng logic.
