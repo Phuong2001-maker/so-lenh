@@ -1,7 +1,13 @@
 <?php
 /* =====================================================================
-   CẤU HÌNH — điền 5 giá trị dưới rồi tải cả thư mục php/ lên hosting.
-   File này bị 3 file kia require, KHÔNG gọi trực tiếp từ trình duyệt.
+   BẢN MẪU — copy file này thành `config.php` rồi điền 4 giá trị.
+
+   `config.php` bị .gitignore cố ý: nó chứa mật khẩu DB và API_TOKEN thật,
+   mà repo này có remote công khai trên GitHub. File mẫu là file duy nhất
+   được commit, nên nó phải LUÔN rỗng giá trị.
+
+   Sửa cấu trúc (thêm hằng số, sửa hàm)? Sửa ở CẢ HAI file, nếu không thì
+   lần clone sau `config.php` mới tạo từ mẫu sẽ thiếu thứ 3 file kia cần.
    ===================================================================== */
 
 // --- Kết nối MySQL (lấy trong 1Panel > Quản lý MySQL) ---
@@ -10,10 +16,17 @@ const DB_NAME = '';          // <-- ĐIỀN tên database (phải khớp DB đã
 const DB_USER = '';          // <-- ĐIỀN tên tài khoản CSDL
 const DB_PASS = '';          // <-- ĐIỀN mật khẩu
 
-/* Token bí mật: tự nghĩ một chuỗi ngẫu nhiên dài (>= 32 ký tự) rồi dán vào đây
-   VÀ dán y hệt vào hằng số API_TOKEN trong index.html.
-   Không có nó thì endpoint ghi nằm trần trên internet, bot quét web sẽ đổ rác vào bảng. */
-const API_TOKEN = '';        // <-- ĐIỀN, ví dụ: 'k7Qp2mXv9wRt4NcB8sLd3FhJ6gYzA1oE'
+/* Token bí mật: chuỗi ngẫu nhiên >= 32 ký tự, phải giống Y HỆT hằng số
+   API_TOKEN trong index.html — lệch một ký tự là ghi.php trả 401.
+   Sinh bằng CSPRNG, đừng tự nghĩ ra chuỗi:
+     PowerShell: $b=New-Object byte[] 24; `
+       [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); `
+       [Convert]::ToBase64String($b) -replace '[+/=]',''
+     PHP:        php -r "echo bin2hex(random_bytes(16));"
+
+   ⚠ Token này nằm trong JS phía client nên AI XEM SOURCE CŨNG ĐỌC ĐƯỢC.
+   Nó chỉ chặn bot quét web đổ rác vào bảng, KHÔNG phải cơ chế xác thực thật. */
+const API_TOKEN = '';        // <-- ĐIỀN
 
 /* Tên miền được phép gọi ghi.php từ trình duyệt.
    Mở app bằng file:// thì Origin là chuỗi 'null' — giữ nguyên dòng dưới.

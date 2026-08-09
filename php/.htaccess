@@ -1,0 +1,20 @@
+# Chặn truy cập TRỰC TIẾP vào file cấu hình qua HTTP.
+#
+# Vì sao cần dù config.php là file PHP: nếu handler PHP của hosting hỏng hoặc bị
+# tắt (đổi bản PHP, sửa sai .htaccess ở thư mục cha), Apache sẽ trả .php dưới dạng
+# VĂN BẢN THUẦN — tức là phơi thẳng mật khẩu DB và API_TOKEN ra internet.
+# 3 file kia require config.php ở tầng đĩa nên KHÔNG bị ảnh hưởng bởi luật này.
+#
+# ⚠ Chỉ có tác dụng trên Apache / LiteSpeed. Hosting chạy nginx thuần BỎ QUA
+# .htaccess — khi đó phải chặn trong server block, hoặc đặt config.php ra ngoài
+# thư mục web rồi sửa đường dẫn require trong ghi.php / cham.php / bao-cao.php.
+
+<FilesMatch "^config(\.mau)?\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

@@ -1,1 +1,5 @@
 .claude/
+
+# Chứa mật khẩu DB + API_TOKEN thật. KHÔNG BAO GIỜ commit.
+# Bản mẫu để commit là php/config.mau.php.
+php/config.php

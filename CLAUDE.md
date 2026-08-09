@@ -34,17 +34,28 @@ Mục đích: mở chat mới, AI đọc đúng file này là hiểu ngay dự �
 
 | Việc | Trạng thái |
 |---|---|
-| Lược đồ MySQL (`db/tao-database.sql`) | ✅ chủ dự án đã tạo database mới và chạy file này |
-| `php/config.php` | ✅ chủ dự án báo đã điền xong (DB_NAME / DB_USER / DB_PASS / API_TOKEN) |
-| Tải thư mục `php/` lên hosting | ⏳ chưa xác nhận |
-| **Nối app với server** | ⛔ **CHƯA — đây là thứ duy nhất chặn việc lưu dữ liệu** |
+| `php/config.php` | ✅ đã điền đủ 4 giá trị (DB `buwsofujhosting_coin_db`, user `buwsofujhosting_coin_user`, token 32 ký tự) |
+| Chống lộ bí mật lên GitHub | ✅ `config.php` đã untrack + vào `.gitignore`, thêm `php/config.mau.php` và `php/.htaccess` |
+| `API_TOKEN` trong index.html | ✅ đã điền, khớp `config.php` |
+| Lược đồ MySQL trên **database MỚI** | ⚠ **phải xác nhận lại** — xem dưới |
+| Tải thư mục `php/` lên hosting | ⏳ chưa |
+| **`API_LOG` trong index.html** | ⛔ **CÒN TRỐNG — thứ duy nhất chặn việc lưu dữ liệu**, chờ tên miền hosting |
 | Cron chạy `cham.php` | ⏳ chưa |
 
 ### ⛔ Việc tiếp theo phải làm
 
-`API_LOG` và `API_TOKEN` ở **index.html dòng 149–150 vẫn để trống**. Hàm `guiLog()` mở đầu bằng `if (!API_LOG ...) return;` nên app **không gửi một byte nào**. Chủ dự án đã cấu hình `php/config.php` (phía server) nhưng đó là chỗ khác — phía app chưa nối dây.
+**1. `API_LOG` ở [index.html:149](index.html:149) vẫn là chuỗi rỗng.** `guiLog()` mở đầu bằng `if (!API_LOG ...) return;` nên app **không gửi một byte nào**. Chủ dự án đã chọn chạy app bằng `file://` từ máy tính (chỉ tải `php/` lên hosting), nên `API_LOG` phải là **URL tuyệt đối** dạng `https://<tên-miền>/php/ghi.php` — đường dẫn tương đối không dùng được với `file://`. `ORIGIN_CHO_PHEP` đã có sẵn `'null'` nên CORS thông.
 
-Cần điền `API_LOG` = URL tới `ghi.php` (nếu app đặt cùng tên miền với PHP thì dùng đường dẫn tương đối `php/ghi.php` là gọn nhất, same-origin nên không dính CORS), và `API_TOKEN` = đúng chuỗi trong `config.php`.
+Hệ quả của lựa chọn `file://`: app **không** chạy 24/7 — nó chỉ ghi khi có tab trình duyệt đang mở. Đổi lại `API_TOKEN` không bị phơi công khai. Muốn ghi liên tục thì phải có một máy để tab mở suốt.
+
+**2. Xác nhận lược đồ đã dựng trên ĐÚNG database mới.** Ảnh chụp panel hosting cho thấy database `buwsofujhosting_coin_db` vừa được tạo, nên rất có thể `db/tao-database.sql` **chưa** chạy trên nó. Kiểm trước khi làm gì tiếp:
+
+```sql
+SHOW TABLES;                              -- phải thấy keo, phi, v_keo
+SHOW COLUMNS FROM keo LIKE 'cham_luc';    -- phải có 1 dòng
+```
+
+Thiếu thì Import lại `db/tao-database.sql` qua tab **Import** (đừng dán vào tab SQL — xem bẫy CodeMirror ở nhật ký).
 
 ### Hai rủi ro hạ tầng đã lường trước
 
@@ -421,7 +432,9 @@ Hướng dẫn triển khai 6 bước: `php/HUONG-DAN.md`. Trạng thái: **code
 | Tệp | Việc |
 |---|---|
 | `db/tao-database.sql` | **FILE DUY NHẤT** — bảng `keo` 49 cột + bảng `phi` + VIEW `v_keo` + dữ liệu nền. Chạy một lần qua tab **Import** (đừng dán vào tab SQL). Không ghi cứng tên database, chạy lại bao nhiêu lần cũng an toàn |
-| `php/config.php` | kết nối DB + token + CORS. **Phải điền 4 giá trị** |
+| `php/config.php` | kết nối DB + token + CORS. ✅ đã điền. **KHÔNG commit** — đã untrack khỏi git |
+| `php/config.mau.php` | bản mẫu rỗng, **file duy nhất được commit**. Sửa cấu trúc config thì phải sửa ở CẢ HAI |
+| `php/.htaccess` | chặn HTTP đọc trực tiếp `config*.php` — phòng trường hợp handler PHP hỏng và Apache trả .php dạng văn bản thuần. Vô tác dụng trên nginx thuần |
 | `php/ghi.php` | nhận kèo theo lô, chống trùng bằng `uid`. Cột kết quả cố ý KHÔNG cho client ghi |
 | `php/cham.php` | cron mỗi phút, chấm bằng nến 1m OKX |
 | `php/bao-cao.php` | trang đọc số |
@@ -445,6 +458,28 @@ Giá gửi lên dưới dạng **chuỗi `toFixed(15)`** — khớp `DECIMAL(30,
 ## Nhật ký thay đổi
 
 Commit gần nhất trước khi có file này: `5d4e6f7` (máy quét OKX + lãi tự động).
+
+- **2026-08-09 (14)** — **Cấu hình tầng log theo thông tin hosting chủ dự án cung cấp.**
+  `php/config.php` điền đủ 4 giá trị (DB `buwsofujhosting_coin_db`, user
+  `buwsofujhosting_coin_user`, token 32 ký tự sinh bằng CSPRNG chứ không tự nghĩ);
+  `API_TOKEN` trong index.html điền khớp. `API_LOG` **vẫn để trống** — chủ dự án chọn chạy app
+  bằng `file://` nên cần URL tuyệt đối, mà tên miền hosting thì chưa có.
+  **Sửa một lỗ bảo mật thật, phát hiện trong lúc làm:** `php/config.php` đang được git theo dõi
+  và repo có remote **công khai** `github.com/Phuong2001-maker/so-lenh` → commit tiếp theo là
+  mật khẩu DB + token lên GitHub. Lịch sử kiểm lại còn sạch (mọi giá trị trong commit `1d93f1d`
+  đều rỗng), nên chỉ cần chặn từ đây: `git rm --cached php/config.php` (file local còn nguyên,
+  **đã staged, chưa commit**), thêm `php/config.php` vào `.gitignore`, và tạo
+  `php/config.mau.php` làm bản mẫu rỗng để lần clone sau vẫn biết phải điền gì.
+  ⚠ Sửa cấu trúc config từ nay phải sửa ở **cả hai** file.
+  Thêm `php/.htaccess` chặn HTTP đọc trực tiếp `config*.php` — không phải phòng người ta gọi
+  file PHP, mà phòng lúc handler PHP hỏng khiến Apache trả `.php` dạng văn bản thuần.
+  **Ghi lại hai điều chưa xử lý:** (a) `bao-cao.php` require config nhưng **không** gọi
+  `kiemTraToken()` nên ai có URL đều đọc được toàn bộ sổ kèo — cố ý để mở được bằng trình duyệt
+  thường, muốn khoá thì dùng HTTP basic auth ở `.htaccess` chứ đừng thêm token; (b) database
+  trong ảnh chụp panel là **mới tạo**, nên `db/tao-database.sql` rất có thể chưa chạy trên nó.
+  Đã kiểm `node --check` trên khối `<script>`: **OK**. Không lint được PHP (máy vẫn không có PHP).
+  Số dòng index.html giữ nguyên **1470** — cố ý sửa đúng 1 dòng tại chỗ để mọi mốc dòng trong
+  tài liệu này không bị lệch.
 
 - **2026-08-09 (13)** — Phiên đọc tài liệu, **không đụng code**. Đối chiếu lại tài liệu với
   thực tế trên đĩa: `index.html` đúng 1470 dòng, các mốc dòng trong tài liệu (`taoEngine` 171,

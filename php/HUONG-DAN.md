@@ -15,14 +15,25 @@ dùng được với bất kỳ database nào đang chọn.
 
 ## 2. Điền `config.php`
 
-Mở `php/config.php`, điền 5 chỗ:
+✅ **Bước này đã làm xong** (2026-08-09, lần cập nhật 14). `php/config.php` đã có đủ
+`DB_NAME` / `DB_USER` / `DB_PASS` / `API_TOKEN`, và `API_TOKEN` trong `index.html` đã khớp.
+
+⚠ **`config.php` KHÔNG được commit** — nó nằm trong `.gitignore` vì repo có remote công khai
+trên GitHub. Bản mẫu rỗng để commit là `config.mau.php`. Clone mới thì copy mẫu thành
+`config.php` rồi điền; **sửa cấu trúc config thì phải sửa ở cả hai file**.
+
+Nếu sau này cần điền lại, đừng tự nghĩ token — sinh bằng CSPRNG:
+
+```bash
+php -r "echo bin2hex(random_bytes(16));"
+```
 
 | Hằng số | Lấy ở đâu |
 |---|---|
-| `DB_NAME` | **tên database mới** bạn vừa tạo |
-| `DB_USER` | 1Panel → Quản lý MySQL → tên tài khoản CSDL |
+| `DB_NAME` | **tên database mới** bạn vừa tạo (kèm tiền tố hosting) |
+| `DB_USER` | 1Panel → Quản lý MySQL → tên tài khoản CSDL (kèm tiền tố) |
 | `DB_PASS` | mật khẩu tài khoản đó |
-| `API_TOKEN` | **tự nghĩ** một chuỗi ngẫu nhiên ≥ 32 ký tự |
+| `API_TOKEN` | chuỗi ngẫu nhiên ≥ 32 ký tự, phải giống y hệt trong `index.html` |
 | `ORIGIN_CHO_PHEP` | giữ nguyên nếu mở app bằng `file://`; thêm tên miền nếu đưa app lên hosting |
 
 ## 3. Tải thư mục `php/` lên hosting
@@ -33,18 +44,31 @@ Mở `php/config.php`, điền 5 chỗ:
 https://onehost-cloudhn112404.000nethost.com/php/ghi.php
 ```
 
-⚠ Nếu hosting cho phép, đặt `config.php` **ngoài** thư mục web rồi sửa dòng `require` trong 3 file kia. Không thì ít nhất tạo file `.htaccess` cạnh nó với nội dung `Require all denied` để chặn truy cập trực tiếp.
+Nhớ tải cả file `php/.htaccess` (file ẩn — nhiều trình FTP mặc định không hiện). Nó chặn HTTP
+đọc trực tiếp `config*.php`, phòng lúc handler PHP hỏng khiến Apache trả `.php` dạng văn bản
+thuần. Hosting chạy **nginx thuần thì bỏ qua `.htaccess`** — khi đó nên đặt `config.php` ra
+ngoài thư mục web rồi sửa dòng `require` trong 3 file kia.
 
 ## 4. Nối app với server
 
-Mở `index.html`, tìm hai hằng số ở đầu khối `<script>` (khoảng dòng 145):
+Mở `index.html` dòng 149–150:
 
 ```
-const API_LOG   = '';    → dán URL ghi.php ở bước 3
-const API_TOKEN = '';    → dán ĐÚNG token đã đặt ở bước 2
+const API_LOG   = '';    → CÒN TRỐNG, phải điền
+const API_TOKEN = '...'; → ✅ đã điền, khớp config.php
 ```
+
+Chủ dự án chạy app bằng `file://` từ máy tính, nên `API_LOG` phải là **URL tuyệt đối**:
+
+```
+const API_LOG = 'https://<tên-miền-hosting>/php/ghi.php';
+```
+
+Đường dẫn tương đối (`php/ghi.php`) **chỉ dùng được** khi index.html cũng nằm trên hosting.
 
 Để trống `API_LOG` là tắt hẳn việc ghi, app chạy y như cũ.
+
+⚠ Chạy bằng `file://` nghĩa là app **không** ghi 24/7 — chỉ ghi khi có tab trình duyệt đang mở.
 
 ## 5. Cài cron chấm sổ
 
