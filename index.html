@@ -6,175 +6,192 @@
 <title>Sổ Lệnh Gộp — Perp USDT</title>
 <style>
 :root{
-  --bg:#0b0e11; --panel:#14181f; --line:#232830;
-  --text:#e8ecf1; --dim:#8a94a3;
-  --green:#0ecb81; --red:#f6465d;
+  --bg:#0a0d12; --panel:#141922; --panel2:#1a212c; --line:#242c38;
+  --text:#e8ecf1; --dim:#7f8996; --dim2:#5c6674;
+  --green:#0ecb81; --red:#f6465d; --amber:#e2b93b; --blue:#3b82f6;
+  --mono:ui-monospace,'SF Mono',SFMono-Regular,Consolas,monospace;
+  --r:12px;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
-body{background:var(--bg); color:var(--text); font:14px/1.45 system-ui,'Segoe UI',sans-serif; padding:16px; max-width:780px; margin:0 auto;}
-header{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
-#sym{background:var(--panel); border:1px solid var(--line); color:var(--text); font:700 16px Consolas,monospace; padding:8px 10px; border-radius:8px; width:130px; text-transform:uppercase;}
-#sym:focus{outline:1px solid #2b6cee;}
-#scan{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
-#scanHead{display:flex; align-items:center; gap:10px; font-weight:700; font-size:14px;}
-#scanHead .note{color:var(--dim); font-weight:400; font-size:11px;}
-#autoBtn{margin-left:auto; background:#173021; border:1px solid var(--green); color:var(--green); font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer;}
-#autoBtn.off{background:#1a1d23; border-color:var(--line); color:var(--dim);}
-#scanBody{display:flex; gap:18px; margin-top:8px; flex-wrap:wrap;}
-#scanUp, #scanDn{flex:1; min-width:280px;}
-.scanRow{display:flex; gap:8px; font:12.5px Consolas,monospace; padding:2px 6px; border-radius:5px; cursor:pointer; align-items:baseline;}
-.scanRow:hover{background:#1a1f27;}
-.scanRow.cur{background:#14202e; outline:1px solid #2b6cee;}
-.scanRow .s{font-weight:700; width:74px;}
-.scanRow .up{color:var(--green);} .scanRow .dn{color:var(--red);}
-.scanRow .v{color:var(--dim); margin-left:auto; font-size:11px;}
-#totalBlock{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; text-align:center; margin-bottom:12px;}
-#netLabel{color:var(--dim); font-size:12px; letter-spacing:1px;}
-#net{font:700 42px Consolas,monospace; margin:2px 0; color:var(--dim);}
-#net.pos{color:var(--green);}
-#net.neg{color:var(--red);}
-#subTotals{color:var(--dim); font-size:13px;}
-#subTotals b{color:var(--text); font-family:Consolas,monospace; font-size:14px;}
-#hint{color:var(--dim); font-size:11px; margin-top:4px;}
-#chg{color:var(--dim); font-size:12px; margin-top:5px;}
-#chg b{font-family:Consolas,monospace;}
-#chg .up{color:var(--green);}
-#chg .dn{color:var(--red);}
-#pAlert{color:#e2b93b; font-size:12px; margin-top:7px; line-height:1.5;}
-#predict{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
-#pLean{font-weight:700; font-size:15px; padding:8px 12px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;}
-#pLean.long{background:rgba(14,203,129,.12); color:var(--green);}
-#pLean.short{background:rgba(246,70,93,.12); color:var(--red);}
-#pLean.neutral{background:#171b22; color:var(--dim);}
-#pLean .conf{font-size:12px; font-weight:400; font-family:Consolas,monospace; opacity:.9;}
-#pGrid{margin:10px 2px 2px;}
-.prow{display:grid; grid-template-columns:175px 115px 80px 1fr; gap:8px; padding:2.5px 0; font-size:13px; align-items:baseline;}
-.prow .pl{font-weight:600;}
-.pl .up{color:var(--green);} .pl .dn{color:var(--red);}
-.prow .pp{font-family:Consolas,monospace; font-weight:700;}
-.prow .pc{font-family:Consolas,monospace; color:var(--dim); text-align:right;}
-.prow .pw{color:var(--dim); font-size:12px;}
-.psep{border-top:1px solid var(--line); margin:6px 0;}
-#pBasis{color:var(--dim); font-size:12px; margin-top:8px;}
-#pWarn{color:var(--dim); font-size:11px; margin-top:3px; opacity:.8;}
-#lvlMap{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
-#lmHead{font-weight:700; font-size:14px;}
-#lmHead .note{color:var(--dim); font-weight:400; font-size:11px; margin-left:8px;}
-#lmAlert{font-size:12.5px; margin-top:6px;}
-#lmMid{color:var(--dim); font-size:11px; text-align:center; padding:4px 0;}
-.cUp{color:var(--green);}
-.cDn{color:var(--red);}
-#topHunt{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px;}
-#thHead{display:flex; align-items:baseline; gap:10px; font-weight:700; font-size:14px;}
-#thHead .note{color:var(--dim); font-weight:400; font-size:11px;}
-#thScore{margin-left:auto; font:700 20px Consolas,monospace; color:var(--dim);}
-#thScore.warm{color:#e2b93b;}
-#thScore.hot{color:var(--red);}
-#thList{margin-top:8px;}
-.thRow{font-size:12.5px; padding:1.5px 0; color:var(--dim);}
-.thRow.on{color:var(--text);}
-.thRow .dotOn{color:var(--red);}
-.thRow .dotOff{opacity:.45;}
-#thTgt{color:var(--text); font-size:12.5px; margin-top:8px; font-family:Consolas,monospace;}
-#thTgt .lbl{color:var(--dim); font-family:system-ui,sans-serif;}
-#thFund{color:var(--dim); font-size:12px; margin-top:4px;}
-#book{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
-.bhead{display:grid; grid-template-columns:110px 100px 120px 1fr; gap:8px; padding:8px 14px; color:var(--dim); font-size:12px; border-bottom:1px solid var(--line);}
-.bhead .q,.bhead .m{text-align:right;}
-.row{display:grid; grid-template-columns:110px 100px 120px 1fr; gap:8px; padding:2.5px 14px; font-family:Consolas,monospace; font-size:13px; align-items:center;}
-.row .p{font-weight:700;}
-.ask .p{color:var(--red);}
-.bid .p{color:var(--green);}
-.row .q,.row .m{text-align:right;}
-.barwrap{height:12px; position:relative;}
-.bar{position:absolute; left:0; top:0; bottom:0; border-radius:3px;}
-.ask .bar{background:rgba(246,70,93,.38);}
-.bid .bar{background:rgba(14,203,129,.38);}
-.wl{position:absolute; right:2px; top:-1px; font-size:10px; color:var(--text); font-family:system-ui,sans-serif; opacity:.85;}
-.w1{color:#e2b93b;}
-#mid{display:flex; justify-content:center; align-items:baseline; gap:10px; padding:9px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:#0f1319; font-family:Consolas,monospace;}
-#mid span{color:var(--dim); font-size:11px; font-family:system-ui,sans-serif;}
-#midPrice{font-weight:700; font-size:17px;}
-#empty{padding:30px; text-align:center; color:var(--dim);}
-footer{color:var(--dim); font-size:11px; margin-top:10px; line-height:1.6;}
+body{background:var(--bg); color:var(--text);
+  font:14px/1.5 system-ui,'Segoe UI',Roboto,sans-serif;
+  padding:16px 16px 30px; max-width:1180px; margin:0 auto;
+  -webkit-font-smoothing:antialiased;}
+.mono{font-family:var(--mono);}
+.up{color:var(--green);} .dn{color:var(--red);}
+.cUp{color:var(--green);} .cDn{color:var(--red);}
+.w1{color:var(--amber);}
+
+/* ---------- khối chung ---------- */
+.card{background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--r); padding:14px 16px; margin-bottom:14px;}
+.card h2{font-size:13px; font-weight:700; letter-spacing:.2px;
+  display:flex; align-items:center; gap:9px; margin-bottom:11px;}
+.card h2 .note{font-weight:400; font-size:11px; color:var(--dim);}
+.cnt{margin-left:auto; font:700 13px var(--mono); color:var(--dim);}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;
+  align-items:start; margin-bottom:14px;}
+.grid2 .card{margin-bottom:0;}
+@media (max-width:900px){ .grid2{grid-template-columns:1fr;} }
+
+/* ---------- thẻ tín hiệu: mỗi coin một thẻ TỰ CHỨA đủ vùng giao dịch + bản đồ mốc
+   (các panel chi tiết riêng đã bỏ, nên mọi thứ phải nằm gọn trong thẻ) ---------- */
+.coinCard{background:var(--panel2); border:1px solid var(--line);
+  border-left-width:3px; border-radius:10px; padding:11px 13px; margin-bottom:11px;}
+.coinCard:last-child{margin-bottom:0;}
+.coinCard.long{border-left-color:var(--green);}
+.coinCard.short{border-left-color:var(--red);}
+.ccHead{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-bottom:8px;}
+.ccSym{font:700 17px var(--mono); letter-spacing:.4px;}
+.ccPrice{font:700 15px var(--mono); color:var(--dim);}
+.ccChg{font-size:11.5px; color:var(--dim2);}
+.ccChg b{font-family:var(--mono);}
+.ccS{margin-left:auto; font:700 18px var(--mono);}
+.ccConf{font:10.5px var(--mono); color:var(--dim2); width:100%; text-align:right; margin-top:-4px;}
+.ccWarn{font-size:11.5px; line-height:1.55; color:var(--amber);
+  background:rgba(226,185,59,.08); border-radius:7px; padding:6px 10px; margin-bottom:8px;}
+.ccBrk{font-size:11.5px; line-height:1.5; padding:6px 10px;
+  border-radius:7px; background:rgba(255,255,255,.045); margin-bottom:8px;}
+.zRow{padding:5px 0;}
+.zTop{display:flex; align-items:baseline; gap:9px;}
+.zTag{font-size:10px; font-weight:700; letter-spacing:.5px; width:40px; flex:none;}
+.zP{font:700 15px var(--mono);}
+.zPct{font:12px var(--mono); color:var(--dim);}
+.zWhy{font-size:11px; color:var(--dim2); margin:1px 0 0 49px; line-height:1.5;}
+.zMini{font-size:11px; color:var(--dim2); line-height:1.75; padding:6px 0 3px;
+  border-top:1px solid rgba(255,255,255,.05);}
+.zMini b{font-family:var(--mono); color:var(--dim);}
+.ccBasis{font-size:10.5px; color:var(--dim2); line-height:1.7;
+  padding:6px 0 3px; border-top:1px solid rgba(255,255,255,.05);}
+.ccBasis b{font-family:var(--mono); color:var(--dim);}
+.ccMap{margin-top:3px; padding-top:5px; border-top:1px solid rgba(255,255,255,.05);}
+.ccMapTit{font-size:9.5px; letter-spacing:.6px; color:var(--dim2); margin-bottom:1px;}
+.emptyList{font-size:12px; color:var(--dim2); padding:18px 8px; text-align:center;}
+
+/* ---------- bản đồ mốc (nằm trong thẻ coin) ---------- */
+.lvl{display:grid; grid-template-columns:78px 1fr; gap:4px 9px; padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.035);}
+.lvl:last-child{border-bottom:0;}
+.lvlTag{font-size:10px; font-weight:700; letter-spacing:.4px; padding-top:3px;}
+.lvlMain{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.lvlP{font:700 14.5px var(--mono);}
+.lvlPct{font:12px var(--mono); color:var(--dim);}
+.lvlBar{flex:1 1 46px; min-width:36px; height:6px;
+  background:var(--panel2); border-radius:3px; overflow:hidden;}
+.lvlBar i{display:block; height:100%; border-radius:3px;}
+.lvlM{font:12px var(--mono); color:var(--dim);}
+.lvlNote{grid-column:2; font-size:11.5px; color:var(--dim2);}
+.trust{font-size:10.5px; padding:1px 7px; border-radius:20px;
+  border:1px solid var(--line); color:var(--dim2); white-space:nowrap;}
+.trust.hi{color:var(--green); border-color:rgba(14,203,129,.35);}
+.trust.mid{color:var(--amber); border-color:rgba(226,185,59,.3);}
+.nowLine{display:flex; align-items:center; gap:11px; margin:9px 0;
+  font:700 13.5px var(--mono); color:var(--text);}
+.nowLine::before,.nowLine::after{content:''; flex:1; height:1px; background:var(--line);}
+/* thu nhỏ bản đồ mốc lại cho vừa bề ngang thẻ coin */
+.ccMap .lvl{grid-template-columns:62px 1fr; padding:4px 0;}
+.ccMap .lvlTag{font-size:9px; padding-top:2px;}
+.ccMap .lvlP{font-size:13px;}
+.ccMap .lvlPct,.ccMap .lvlM{font-size:11px;}
+.ccMap .lvlNote{font-size:10.5px;}
+.ccMap .nowLine{font-size:12px; margin:6px 0;}
+.ccMap .trust{font-size:10px; padding:0 6px;}
+
+/* ---------- máy quét ---------- */
+#scanBody{display:grid; grid-template-columns:1fr 1fr; gap:6px 22px;}
+@media (max-width:660px){ #scanBody{grid-template-columns:1fr;} }
+.scanCol h3{font-size:10px; letter-spacing:.5px; color:var(--dim2);
+  font-weight:600; margin:0 0 4px 8px;}
+.scanRow{display:grid; grid-template-columns:1fr 60px 76px 62px; gap:8px;
+  font:12.5px var(--mono); padding:4px 8px; border-radius:6px;
+  cursor:pointer; align-items:baseline;}
+.scanRow:hover{background:var(--panel2);}
+.scanRow.theodoi{background:rgba(59,130,246,.09);}
+.scanRow.ghim{background:rgba(59,130,246,.17);
+  box-shadow:inset 0 0 0 1px rgba(59,130,246,.45);}
+.scanRow .s{font-weight:700;}
+.scanRow .v{color:var(--dim2); font-size:11px; text-align:right;}
+
 </style>
 </head>
 <body>
 
-<header>
-  <input id="sym" value="BTC" placeholder="nhập mã coin" spellcheck="false">
-</header>
+<section class="card">
+  <h2>📡 QUÉT OKX <span class="note" id="scanNote">đang quét…</span></h2>
+  <div id="scanBody"><div class="scanCol" id="scanUp">Đang quét…</div><div class="scanCol" id="scanDn"></div></div>
+</section>
 
-<div id="scan">
-  <div id="scanHead">📡 QUÉT OKX <span class="note">tự nạp coin nóng nhất vào phân tích — bấm dòng nào để xem tay coin đó</span><button id="autoBtn">TỰ ĐỘNG: BẬT</button></div>
-  <div id="scanBody"><div id="scanUp">Đang quét…</div><div id="scanDn"></div></div>
+<div class="grid2">
+  <section class="card">
+    <h2><span class="cUp">⬆ LONG</span> <span class="note">máy nghiêng mua — vào tại tường đỡ</span><span id="cntLong" class="cnt">—</span></h2>
+    <div id="listLong"></div>
+  </section>
+  <section class="card">
+    <h2><span class="cDn">⬇ SHORT</span> <span class="note">máy nghiêng bán — vào tại tường kháng</span><span id="cntShort" class="cnt">—</span></h2>
+    <div id="listShort"></div>
+  </section>
 </div>
-
-<div id="totalBlock">
-  <div id="netLabel">TỔNG (TIỀN CHỜ MUA − TIỀN CHỜ BÁN)</div>
-  <div id="net">—</div>
-  <div id="subTotals">Chờ MUA: <b id="buyT">—</b> &nbsp;·&nbsp; Chờ BÁN: <b id="sellT">—</b></div>
-  <div id="chg"></div>
-  <div id="hint">Dương = tiền chờ MUA dày hơn &nbsp;·&nbsp; Âm = tiền chờ BÁN dày hơn</div>
-</div>
-
-<div id="predict">
-  <div id="pLean" class="neutral">● Đang chờ dữ liệu…</div>
-  <div id="pGrid" style="display:none"></div>
-  <div id="pAlert"></div>
-  <div id="pBasis"></div>
-  <div id="pWarn">⚠ Nhận định từ dữ liệu, không phải lời khuyên — tường rút là vô hiệu</div>
-</div>
-
-<div id="lvlMap">
-  <div id="lmHead">🧱 BẢN ĐỒ MỐC <span class="note">tường lớn hai phía — vượt mốc TRỐNG là chạy nhanh</span></div>
-  <div id="lmAlert" style="display:none"></div>
-  <div id="lmRes"></div>
-  <div id="lmMid"></div>
-  <div id="lmSup"></div>
-</div>
-
-<div id="topHunt">
-  <div id="thHead">🎯 SĂN ĐỈNH <span class="note">cho kèo short khoảng dài — điểm cao = cú pump đang kiệt sức</span><span id="thScore">—</span></div>
-  <div id="thList"></div>
-  <div id="thTgt"></div>
-  <div id="thFund"></div>
-</div>
-
-<div id="book">
-  <div class="bhead"><div>Giá</div><div class="q">Khối lượng</div><div class="m">Thành tiền</div><div></div></div>
-  <div id="asks"></div>
-  <div id="mid"><span>GIÁ HIỆN TẠI</span><div id="midPrice">—</div></div>
-  <div id="bids"></div>
-  <div id="empty" style="display:none">Đang kết nối các sàn…</div>
-</div>
-
-<footer>
-  Chỉ hiển thị <b>lệnh CHƯA khớp</b> (đang treo chờ trên sổ). Gộp sổ lệnh perpetual USDT từ:
-  Binance (20 mốc sát giá) · Bybit (200) · OKX (400) · Bitget (toàn bộ sổ) — hiển thị
-  <b>tất cả</b> mốc có tiền đáng kể (đã lọc lệnh bụi), bước giá tự điều chỉnh theo độ sâu dữ liệu.
-  TỔNG tính trên toàn bộ mốc hiển thị. Các sàn cho độ sâu khác nhau nên các mốc xa
-  chủ yếu đến từ sàn có sổ sâu hơn.
-</footer>
 
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
+
+/* ============ SỐ COIN THEO DÕI SONG SONG ============
+   Mỗi coin tốn 5 WebSocket + 2 lệnh gọi REST định kỳ. Tăng số này lên là tăng
+   tuyến tính cả băng thông lẫn CPU (vòng phân tích chạy mỗi 2 giây cho TỪNG coin).
+   8 là mức đã đo chạy mượt trên máy để bàn; máy yếu thì hạ xuống 4-6. */
+const SO_COIN = 8;
+
+/* ============ GHI LOG LÊN SERVER ============
+   Để trống API_LOG là TẮT HẲN việc ghi (app chạy y như cũ, không gọi mạng).
+   Điền URL ghi.php sau khi tải thư mục php/ lên hosting, và dán token y hệt
+   giá trị API_TOKEN trong php/config.php. */
+const API_LOG   = '';
+const API_TOKEN = '';
+
+/* Ngưỡng GHI thấp hơn ngưỡng HIỂN THỊ (25) có chủ đích: ghi cả những kèo bị 4
+   chốt chặn loại bỏ rồi đánh dấu bằng cột `chan`, để sau này đo được chốt chặn
+   đang cứu hay đang cắt mất kèo thắng. Đây là nhóm đối chứng duy nhất, và dữ
+   liệu bị chặn mà không ghi là mất vĩnh viễn. Lọc lại bằng SQL lúc phân tích. */
+const NGUONG_GHI = 15;
+
 const EX = [
   {key:'binance', label:'Binance'},
   {key:'bybit',   label:'Bybit'},
   {key:'okx',     label:'OKX'},
   {key:'bitget',  label:'Bitget'},
 ];
-const conns = {};
-let gen = 0;
 
-function mkConn(key, label){
-  conns[key] = {key, label, state:'off', note:'chưa chạy', variant:'',
-    bids:new Map(), asks:new Map(), pMul:1, qMul:1, lastMsg:0, ws:null, timers:[],
-    exMid:null, excluded:false};
+/* ==================================================================
+   MỘT "ENGINE" = toàn bộ trạng thái phân tích của ĐÚNG MỘT coin.
+   Trước đây tất cả những thứ này là biến toàn cục (chỉ chạy được 1 coin).
+   E.gen là bộ đếm thế hệ RIÊNG của từng coin: dừng engine thì gen++ và mọi
+   callback WebSocket cũ tự thấy g !== E.gen rồi im lặng thoát.
+   ================================================================== */
+function taoEngine(sym){
+  const E = {
+    sym, gen: 0, timers: [], conns: {},
+    flowSec: [],   /* dòng tiền khớp gộp theo giây: {t(giây), n(USD có dấu)} */
+    liqs: [],      /* thanh lý: {t, side:'long'|'short', n} */
+    midHist: [],   /* lịch sử giá giữa: {t, p} */
+    wallBook: {}, lvlWatch: {}, brkAlert: null, lastMidForBrk: null,
+    market: {funding: null, fundH: 8, oi: null, oiHist: [], atr4h: null},
+    pred: {ready: false},
+    engineStart: 0,
+    listTime: null,      /* ms epoch coin lên sàn OKX — dùng tính tuổi coin */
+    keoMo: null,         /* kèo thật đang mở (chưa chốt sổ) */
+    keoBongMo: null      /* kèo bóng đang mở — nhóm đối chứng cho 4 chốt chặn */
+  };
+  EX.forEach((e, i) => {
+    E.conns[e.key] = {key: e.key, label: e.label, state: 'off', note: 'chưa chạy',
+      variant: '', bids: new Map(), asks: new Map(), pMul: 1, qMul: 1,
+      lastMsg: 0, ws: null, ws2: null, timers: [], exMid: null,
+      excluded: false, bit: 1 << i};
+  });
+  return E;
 }
-EX.forEach((e, i) => { mkConn(e.key, e.label); conns[e.key].bit = 1 << i; });
+
+const engines = {};      /* sym -> engine */
 
 function setState(c, s, note){ c.state = s; c.note = note || ''; }
 
@@ -198,14 +215,14 @@ function applySide(map, arr, replace){
   }
 }
 
-function scheduleRetry(c, g, fn, note){
+function scheduleRetry(E, c, g, fn, note){
   setState(c, 'wait', note || 'mất kết nối — thử lại sau 3s');
-  c.timers.push(setTimeout(() => { if (g === gen) fn(); }, 3000));
+  c.timers.push(setTimeout(() => { if (g === E.gen) fn(); }, 3000));
 }
 
 /* ---------- BINANCE (USDT-M futures) ---------- */
-function startBinance(sym, g, variant){
-  const c = conns.binance;
+function startBinance(E, g, variant){
+  const sym = E.sym, c = E.conns.binance;
   clearConn(c);
   if (variant){ c.variant = '1000×'; c.pMul = 1/1000; c.qMul = 1000; }
   const stream = ((variant ? '1000' : '') + sym + 'usdt').toLowerCase() + '@depth20@100ms';
@@ -217,7 +234,7 @@ function startBinance(sym, g, variant){
   setState(c, 'wait', 'đang kết nối');
   ws.onopen = () => { opened = true; };
   ws.onmessage = e => {
-    if (g !== gen) return;
+    if (g !== E.gen) return;
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     const b = d.b || d.bids, a = d.a || d.asks;
     if (!b && !a) return;
@@ -227,35 +244,35 @@ function startBinance(sym, g, variant){
     applySide(c.asks, a || [], true);
   };
   ws.onclose = () => {
-    if (g !== gen || c.ws !== ws) return;
-    scheduleRetry(c, g, () => startBinance(sym, g, variant));
+    if (g !== E.gen || c.ws !== ws) return;
+    scheduleRetry(E, c, g, () => startBinance(E, g, variant));
   };
   /* socket thứ 2: lệnh ĐÃ khớp (aggTrade) + thanh lý (forceOrder)
      — PHẢI dùng base /market/stream mới: URL /stream cũ bị Binance khai tử 23/04/2026,
      vẫn mở được nhưng câm lặng vĩnh viễn. Có tự nối lại khi rớt. */
   const s2 = ((variant ? '1000' : '') + sym + 'usdt').toLowerCase();
   const openWs2 = () => {
-    if (g !== gen || c.ws !== ws) return;
+    if (g !== E.gen || c.ws !== ws) return;
     let ws2;
     try { ws2 = new WebSocket('wss://fstream.binance.com/market/stream?streams=' + s2 + '@aggTrade/' + s2 + '@forceOrder'); }
     catch(e){ return; }
     c.ws2 = ws2;
     ws2.onmessage = e => {
-      if (g !== gen) return;
+      if (g !== E.gen) return;
       let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
       const d = m.data;
       if (!d) return;
       if (d.e === 'aggTrade'){
         /* m=true: bên mua là maker → lệnh chủ động là BÁN */
-        pushTrade((d.m ? -1 : 1) * parseFloat(d.p) * c.pMul * parseFloat(d.q) * c.qMul);
+        pushTrade(E, (d.m ? -1 : 1) * parseFloat(d.p) * c.pMul * parseFloat(d.q) * c.qMul);
       } else if (d.e === 'forceOrder' && d.o){
         const o = d.o;
         const px = parseFloat(o.ap || o.p) * c.pMul, q = parseFloat(o.q) * c.qMul;
-        if (isFinite(px) && isFinite(q)) pushLiq(o.S === 'SELL' ? 'long' : 'short', px * q);
+        if (isFinite(px) && isFinite(q)) pushLiq(E, o.S === 'SELL' ? 'long' : 'short', px * q);
       }
     };
     ws2.onclose = () => {
-      if (g !== gen || c.ws !== ws) return;
+      if (g !== E.gen || c.ws !== ws) return;
       c.timers.push(setTimeout(openWs2, 3000));
     };
   };
@@ -264,13 +281,13 @@ function startBinance(sym, g, variant){
   /* probe: sau 6s không có dữ liệu — nếu socket chưa từng mở là lỗi mạng (thử lại),
      nếu mở rồi mà im lặng là stream không tồn tại (thử biến thể 1000×, hết thì báo off) */
   c.timers.push(setTimeout(() => {
-    if (g !== gen || c.ws !== ws || c.lastMsg) return;
+    if (g !== E.gen || c.ws !== ws || c.lastMsg) return;
     /* chỉ kết luận "cặp không tồn tại" khi socket VẪN ĐANG MỞ mà câm lặng;
        socket đã rớt giữa chừng = lỗi mạng → thử lại cùng cặp */
     const stillOpen = opened && ws.readyState === 1;
     clearConn(c);
-    if (!stillOpen) scheduleRetry(c, g, () => startBinance(sym, g, variant), 'mạng chậm — thử lại sau 3s');
-    else if (!variant) startBinance(sym, g, true);
+    if (!stillOpen) scheduleRetry(E, c, g, () => startBinance(E, g, variant), 'mạng chậm — thử lại sau 3s');
+    else if (!variant) startBinance(E, g, true);
     else setState(c, 'off', 'không có cặp này');
   }, 6000));
 }
@@ -283,9 +300,9 @@ const BYBIT_VARIANTS = [
   {pair: s => '10000' + s + 'USDT',   m: 10000,   tag: '10000×'},
   {pair: s => '1000000' + s + 'USDT', m: 1000000, tag: '1M×'},
 ];
-function startBybit(sym, g, vi){
+function startBybit(E, g, vi){
   vi = vi || 0;
-  const c = conns.bybit;
+  const sym = E.sym, c = E.conns.bybit;
   clearConn(c);
   if (vi >= BYBIT_VARIANTS.length){ setState(c, 'off', 'không có cặp này'); return; }
   const v = BYBIT_VARIANTS[vi];
@@ -303,19 +320,19 @@ function startBybit(sym, g, vi){
     c.timers.push(setInterval(() => { try{ ws.send(JSON.stringify({op:'ping'})); }catch(e){} }, 20000));
   };
   ws.onmessage = e => {
-    if (g !== gen) return;
+    if (g !== E.gen) return;
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     if (d.ret_msg === 'pong' || d.op === 'pong'){ c.lastMsg = Date.now(); return; }
     if (d.success === false && d.op === 'subscribe'){
       clearConn(c);
-      startBybit(sym, g, vi + 1);
+      startBybit(E, g, vi + 1);
       return;
     }
     if (!d.topic || !d.data) return;
     c.lastMsg = Date.now();
     if (d.topic.indexOf('publicTrade') === 0){
       for (const t of d.data)
-        pushTrade((t.S === 'Buy' ? 1 : -1) * parseFloat(t.p) * c.pMul * parseFloat(t.v) * c.qMul);
+        pushTrade(E, (t.S === 'Buy' ? 1 : -1) * parseFloat(t.p) * c.pMul * parseFloat(t.v) * c.qMul);
       return;
     }
     if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
@@ -324,21 +341,21 @@ function startBybit(sym, g, vi){
     applySide(c.asks, d.data.a || [], snap);
   };
   ws.onclose = () => {
-    if (g !== gen || c.ws !== ws) return;
-    scheduleRetry(c, g, () => startBybit(sym, g, vi));
+    if (g !== E.gen || c.ws !== ws) return;
+    scheduleRetry(E, c, g, () => startBybit(E, g, vi));
   };
   c.timers.push(setTimeout(() => {
-    if (g !== gen || c.ws !== ws || c.lastMsg) return;
+    if (g !== E.gen || c.ws !== ws || c.lastMsg) return;
     const stillOpen = opened && ws.readyState === 1;
     clearConn(c);
-    if (!stillOpen) scheduleRetry(c, g, () => startBybit(sym, g, vi), 'mạng chậm — thử lại sau 3s');
-    else startBybit(sym, g, vi + 1);
+    if (!stillOpen) scheduleRetry(E, c, g, () => startBybit(E, g, vi), 'mạng chậm — thử lại sau 3s');
+    else startBybit(E, g, vi + 1);
   }, 6000));
 }
 
 /* ---------- OKX (USDT swap) — khối lượng tính theo HỢP ĐỒNG, cần nhân ctVal ---------- */
-async function startOkx(sym, g){
-  const c = conns.okx;
+async function startOkx(E, g){
+  const sym = E.sym, c = E.conns.okx;
   clearConn(c);
   const inst = sym + '-USDT-SWAP';
   setState(c, 'wait', 'đang lấy thông tin hợp đồng');
@@ -347,15 +364,20 @@ async function startOkx(sym, g){
     const r = await fetch('https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=' + inst);
     const j = await r.json();
     if (!j.data || !j.data.length){
-      if (g === gen) setState(c, 'off', 'không có cặp này');
+      if (g === E.gen) setState(c, 'off', 'không có cặp này');
       return;
     }
     ctVal = parseFloat(j.data[0].ctVal) || 1;
+    /* TUỔI COIN — coin mới niêm yết vài ngày thì mọi thống kê đều là rác:
+       sổ mỏng, chưa có lịch sử tường, biên độ chưa ổn định. Chỉ tốn 1 dòng vì
+       endpoint này app vốn đã phải gọi để lấy ctVal. */
+    const lt = parseFloat(j.data[0].listTime);
+    if (isFinite(lt) && lt > 0) E.listTime = lt;
   } catch(e){
-    if (g === gen) scheduleRetry(c, g, () => startOkx(sym, g), 'lỗi mạng khi lấy hệ số hợp đồng — thử lại sau 3s');
+    if (g === E.gen) scheduleRetry(E, c, g, () => startOkx(E, g), 'lỗi mạng khi lấy hệ số hợp đồng — thử lại sau 3s');
     return;
   }
-  if (g !== gen) return;
+  if (g !== E.gen) return;
   c.qMul = ctVal;
   if (ctVal !== 1) c.variant = '×' + ctVal;
   let ws;
@@ -364,11 +386,17 @@ async function startOkx(sym, g){
   c.ws = ws;
   setState(c, 'wait', 'đang kết nối');
   ws.onopen = () => {
-    ws.send(JSON.stringify({op:'subscribe', args:[{channel:'books', instId:inst}, {channel:'trades', instId:inst}]}));
+    ws.send(JSON.stringify({op:'subscribe', args:[
+      {channel:'books', instId:inst},
+      {channel:'trades', instId:inst},
+      /* open-interest qua WS: ~8 gói/phút, có sẵn oiUsd. Thay hẳn việc poll REST
+         mỗi 60 giây — độ phân giải cao gấp ~8 lần mà lại GIẢM số request. */
+      {channel:'open-interest', instId:inst}
+    ]}));
     c.timers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
   };
   ws.onmessage = e => {
-    if (g !== gen) return;
+    if (g !== E.gen) return;
     if (e.data === 'pong'){ c.lastMsg = Date.now(); return; }
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     if (d.event === 'error'){ setState(c, 'off', 'sàn báo lỗi: ' + (d.msg || d.code)); clearConn(c); return; }
@@ -376,7 +404,22 @@ async function startOkx(sym, g){
     c.lastMsg = Date.now();
     if (d.arg.channel === 'trades'){
       for (const t of d.data)
-        pushTrade((t.side === 'buy' ? 1 : -1) * parseFloat(t.px) * parseFloat(t.sz) * c.qMul);
+        pushTrade(E, (t.side === 'buy' ? 1 : -1) * parseFloat(t.px) * parseFloat(t.sz) * c.qMul);
+      return;
+    }
+    if (d.arg.channel === 'open-interest'){
+      const v = parseFloat(d.data[0].oiCcy);
+      if (isFinite(v) && v > 0){
+        E.market.oi = v;
+        E.market.oiUsd = parseFloat(d.data[0].oiUsd) || null;
+        const h = E.market.oiHist;
+        /* giữ nhịp ~30 giây/mẫu để cửa sổ 25 phút của tín hiệu OI không bị
+           một luồng 8 gói/phút đẩy trôi mất */
+        if (!h.length || Date.now() - h[h.length - 1].t > 30000){
+          h.push({t: Date.now(), v});
+          if (h.length > 240) h.shift();
+        }
+      }
       return;
     }
     if (d.arg.channel !== 'books') return;
@@ -387,8 +430,8 @@ async function startOkx(sym, g){
     applySide(c.asks, dd.asks || [], snap);
   };
   ws.onclose = () => {
-    if (g !== gen || c.ws !== ws) return;
-    scheduleRetry(c, g, () => startOkx(sym, g));
+    if (g !== E.gen || c.ws !== ws) return;
+    scheduleRetry(E, c, g, () => startOkx(E, g));
   };
 }
 
@@ -398,9 +441,9 @@ const BITGET_VARIANTS = [
   {pre: '1000', m: 1000,    tag: '1000×'},
   {pre: '1M',   m: 1000000, tag: '1M×'},
 ];
-function startBitget(sym, g, vi){
+function startBitget(E, g, vi){
   vi = vi || 0;
-  const c = conns.bitget;
+  const sym = E.sym, c = E.conns.bitget;
   clearConn(c);
   if (vi >= BITGET_VARIANTS.length){ setState(c, 'off', 'không có cặp này'); return; }
   const v = BITGET_VARIANTS[vi];
@@ -419,10 +462,10 @@ function startBitget(sym, g, vi){
     c.timers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
   };
   ws.onmessage = e => {
-    if (g !== gen) return;
+    if (g !== E.gen) return;
     if (e.data === 'pong'){ c.lastMsg = Date.now(); return; }
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
-    if (d.event === 'error'){ clearConn(c); startBitget(sym, g, vi + 1); return; }
+    if (d.event === 'error'){ clearConn(c); startBitget(E, g, vi + 1); return; }
     if (!d.data || !d.data.length) return;
     c.lastMsg = Date.now();
     if (d.arg && d.arg.channel === 'trade'){
@@ -432,7 +475,7 @@ function startBitget(sym, g, vi){
           const px = parseFloat(t.price !== undefined ? t.price : t.px);
           const sz = parseFloat(t.size !== undefined ? t.size : t.sz);
           if (isFinite(px) && isFinite(sz))
-            pushTrade((t.side === 'buy' ? 1 : -1) * px * c.pMul * sz * c.qMul);
+            pushTrade(E, (t.side === 'buy' ? 1 : -1) * px * c.pMul * sz * c.qMul);
         }
       }
       return;
@@ -445,64 +488,60 @@ function startBitget(sym, g, vi){
     applySide(c.asks, dd.asks || [], snap);
   };
   ws.onclose = () => {
-    if (g !== gen || c.ws !== ws) return;
-    scheduleRetry(c, g, () => startBitget(sym, g, vi));
+    if (g !== E.gen || c.ws !== ws) return;
+    scheduleRetry(E, c, g, () => startBitget(E, g, vi));
   };
 }
 
 /* ==================================================================
-   MÁY PHÂN TÍCH KHUNG GIỜ
+   MÁY PHÂN TÍCH KHUNG GIỜ  (mọi hàm nhận engine E làm tham số đầu)
    - dòng tiền đã khớp (gộp 4 sàn, chuẩn hóa USD, dấu + = mua chủ động)
    - bộ theo dõi tường: tuổi, bài kiểm tra tiếp cận, xác nhận chéo sàn
    - funding + OI (OKX REST) + thanh lý (Binance) + biên 4h (nến 15m)
-   - điểm tổng hợp 6 tín hiệu + nhật ký tự chấm điểm
+   - điểm tổng hợp 6 tín hiệu
    ================================================================== */
 function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
 function bitCount(x){ let n = 0; while (x){ n += x & 1; x >>= 1; } return n; }
 
-let flowSec = [];   /* dòng tiền khớp gộp theo giây: {t(giây), n(USD có dấu)} */
-let liqs = [];      /* thanh lý: {t, side:'long'|'short', n} */
-let midHist = [];   /* lịch sử giá giữa: {t, p} */
-let engineStart = 0;
-let predTimers = [];
-
-function pushTrade(n){
+function pushTrade(E, n){
   if (!isFinite(n)) return;
   const s = Math.floor(Date.now() / 1000);
-  const last = flowSec[flowSec.length - 1];
-  if (last && last.t === s) last.n += n;
-  else flowSec.push({t: s, n});
+  const last = E.flowSec[E.flowSec.length - 1];
+  /* GIỮ RIÊNG mua và bán, không chỉ hiệu số: n=0 có thể là "chợ chết" (không ai
+     giao dịch) hoặc "hai phe đánh nhau ngang cơ" — hai trạng thái hoàn toàn khác
+     nhau mà bộ đếm có dấu cũ gộp làm một. Mất là mất vĩnh viễn, không backfill được. */
+  const mua = n > 0 ? n : 0, ban = n < 0 ? -n : 0;
+  if (last && last.t === s){ last.n += n; last.mua += mua; last.ban += ban; }
+  else E.flowSec.push({t: s, n, mua, ban});
 }
-function pushLiq(side, n){ liqs.push({t: Date.now(), side, n}); }
+function pushLiq(E, side, n){ E.liqs.push({t: Date.now(), side, n}); }
 
-function flowStats(){
+function flowStats(E){
   const now = Math.floor(Date.now() / 1000);
-  while (flowSec.length && now - flowSec[0].t > 7200) flowSec.shift();
-  let f5 = 0, f30 = 0;
-  for (const x of flowSec){
+  while (E.flowSec.length && now - E.flowSec[0].t > 7200) E.flowSec.shift();
+  let f5 = 0, f30 = 0, mua30 = 0, ban30 = 0;
+  for (const x of E.flowSec){
     const age = now - x.t;
     if (age <= 300) f5 += x.n;
-    if (age <= 1800) f30 += x.n;
+    if (age <= 1800){ f30 += x.n; mua30 += x.mua; ban30 += x.ban; }
   }
-  return {f5, f30};
+  return {f5, f30, mua30, ban30};
 }
-function liqStats(){
+function liqStats(E){
   const now = Date.now();
-  while (liqs.length && now - liqs[0].t > 1800e3) liqs.shift();
-  let L = 0, S = 0, L30 = 0, S30 = 0;
-  for (const x of liqs){
-    if (x.side === 'long') L30 += x.n; else S30 += x.n;
+  while (E.liqs.length && now - E.liqs[0].t > 1800e3) E.liqs.shift();
+  let L = 0, S = 0;
+  for (const x of E.liqs){
     if (now - x.t <= 300e3){ if (x.side === 'long') L += x.n; else S += x.n; }
   }
-  return {L, S, L30, S30};
+  return {L, S};
 }
 
-/* ---- bộ theo dõi tường (lọc lệnh ảo) — chỉ sống trong RAM, reset khi đổi coin ---- */
-let wallBook = {};
-let lvlWatch = {}, brkAlert = null, lastMidForBrk = null;   /* theo dõi vượt mốc lớn */
+/* ---- bộ theo dõi tường (lọc lệnh ảo) — sống trong RAM theo từng coin ---- */
 function wallKey(side, p){ return side + ':' + p.toPrecision(6); }
-function updateWalls(A){
+function updateWalls(E, A){
   if (!A) return;
+  const wallBook = E.wallBook;
   const now = Date.now();
   /* ngưỡng "áp sát"/"rời xa" theo BƯỚC GIÁ — tự co giãn theo độ mịn của sổ
      (ngưỡng % cố định từng làm sổ dày như BTC bị chấm oan hàng loạt) */
@@ -555,8 +594,8 @@ function updateWalls(A){
     if (wallBook[key] && w.l && now - w.l > 24 * 3600e3) delete wallBook[key];
   }
 }
-function wallTrust(side, p){
-  const w = wallBook[wallKey(side, p)];
+function wallTrust(E, side, p){
+  const w = E.wallBook[wallKey(side, p)];
   if (!w) return 30;
   const ageMin = ((w.l || w.f) - w.f) / 60000;
   /* tường CHƯA từng bị giá thử (chưa chịu chạm, chưa bị khớp) thì "sống lâu"
@@ -567,8 +606,8 @@ function wallTrust(side, p){
         + (w.cx >= 2 ? 10 : 0) + (w.cx >= 3 ? 5 : 0);
   return clamp(Math.round(s), 0, 100);
 }
-function wallInfo(side, p){
-  const w = wallBook[wallKey(side, p)];
+function wallInfo(E, side, p){
+  const w = E.wallBook[wallKey(side, p)];
   if (!w) return '';
   const age = Math.round(((w.l || w.f) - w.f) / 60000);
   let t = `sống ${age}'`;
@@ -579,15 +618,13 @@ function wallInfo(side, p){
 }
 
 /* ---- funding / OI / biên 4h (OKX REST — CORS đã kiểm chứng) ---- */
-let market = {funding: null, fundH: 8, oi: null, oiHist: [], atr4h: null};
-async function pollMarket(sym, g){
-  const inst = sym + '-USDT-SWAP';
+async function pollMarket(E, g){
+  const inst = E.sym + '-USDT-SWAP';
   try{
-    const [fr, oi] = await Promise.all([
-      fetch('https://www.okx.com/api/v5/public/funding-rate?instId=' + inst).then(r => r.json()),
-      fetch('https://www.okx.com/api/v5/public/open-interest?instId=' + inst).then(r => r.json()),
-    ]);
-    if (g !== gen) return;
+    /* CHỈ còn funding — open interest đã chuyển sang kênh WebSocket open-interest */
+    const fr = await fetch('https://www.okx.com/api/v5/public/funding-rate?instId=' + inst).then(r => r.json());
+    if (g !== E.gen) return;
+    const market = E.market;
     if (fr.data && fr.data[0]){
       const fd = fr.data[0];
       const f = parseFloat(fd.fundingRate);
@@ -598,20 +635,12 @@ async function pollMarket(sym, g){
       else if (isFinite(t2) && isFinite(t1) && t2 > t1) ivH = (t2 - t1) / 3600e3;
       if (isFinite(f)){ market.funding = f; market.fundH = Math.round(ivH) || 8; }
     }
-    if (oi.data && oi.data[0]){
-      const v = parseFloat(oi.data[0].oiCcy || oi.data[0].oi);
-      if (isFinite(v)){
-        market.oi = v;
-        market.oiHist.push({t: Date.now(), v});
-        if (market.oiHist.length > 240) market.oiHist.shift();
-      }
-    }
   }catch(e){}
 }
-async function pollCandles(sym, g){
+async function pollCandles(E, g){
   try{
-    const j = await fetch('https://www.okx.com/api/v5/market/candles?instId=' + sym + '-USDT-SWAP&bar=15m&limit=192').then(r => r.json());
-    if (g !== gen || !j.data || j.data.length < 16) return;
+    const j = await fetch('https://www.okx.com/api/v5/market/candles?instId=' + E.sym + '-USDT-SWAP&bar=15m&limit=192').then(r => r.json());
+    if (g !== E.gen || !j.data || j.data.length < 16) return;
     const D = j.data;   /* nến 15m, MỚI NHẤT trước (192 nến = 48h) */
     /* biên dao động điển hình (trung vị) của cửa sổ n nến */
     const med = n => {
@@ -627,27 +656,22 @@ async function pollCandles(sym, g){
       rs.sort((a, b) => a - b);
       return rs.length ? rs[Math.floor(rs.length / 2)] : null;
     };
-    market.ranges = {h1: med(4), h2: med(8), h4: med(16)};
-    market.atr4h = market.ranges.h4;
+    E.market.ranges = {h1: med(4), h2: med(8), h4: med(16)};
+    E.market.atr4h = E.market.ranges.h4;
     /* giá đóng cửa tham chiếu để tính % biến động 1h / 4h / 24h */
     const cl = i => (D[i] ? parseFloat(D[i][4]) : null);
-    market.ref = {c1: cl(4), c4: cl(16), c24: cl(Math.min(96, D.length - 1))};
-    /* chân cú pump: đáy thấp nhất 48h — coin xì hơi rất hay quay về điểm xuất phát */
-    let lo = Infinity;
-    for (const k of D){ const l = parseFloat(k[3]); if (l > 0 && l < lo) lo = l; }
-    market.pumpLow = isFinite(lo) ? lo : null;
+    E.market.ref = {c1: cl(4), c4: cl(16), c24: cl(Math.min(96, D.length - 1))};
   }catch(e){}
 }
 
 /* ---- điểm tổng hợp + mục tiêu ---- */
-let pred = {ready: false};
 /* chọn tối đa 3 tường mạnh nhất (tiền × tin) trong 15%, cách nhau ≥1.5% để không dính chùm */
-function pickLevels(rows, side, mid, isBid){
+function pickLevels(E, rows, side, mid, isBid){
   const cands = [];
   for (const r of rows){
     const d = isBid ? (mid - r.p) / mid : (r.p - mid) / mid;
     if (d <= 0.001 || d > 0.15) continue;
-    const t = wallTrust(side, r.p);
+    const t = wallTrust(E, side, r.p);
     cands.push({p: r.p, m: r.m, trust: t, d, ex: r.ex, score: r.m * (t / 100)});
   }
   cands.sort((a, b) => b.score - a.score);
@@ -661,25 +685,26 @@ function pickLevels(rows, side, mid, isBid){
   return picked;
 }
 
-function bestWall(rows, side, mid, cap, isBid){
+function bestWall(E, rows, side, mid, cap, isBid){
   let best = null, bs = 0;
   for (const r of rows){
     const d = isBid ? (mid - r.p) / mid : (r.p - mid) / mid;
     if (d <= 0 || d > cap) continue;
-    const t = wallTrust(side, r.p);
+    const t = wallTrust(E, side, r.p);
     const score = r.m * (t / 100) * (t >= 55 ? 1 : 0.3);
-    if (score > bs){ bs = score; best = {p: r.p, m: r.m, trust: t, ex: r.ex || 0}; }
+    if (score > bs){ bs = score; best = {p: r.p, m: r.m, trust: t, ex: r.ex || 0, mGop: r.mGop || r.m}; }
   }
   return best;
 }
-function analyze(A){
-  if (!A){ pred = {ready: false}; return; }
+function analyze(E, A){
+  if (!A){ E.pred = {ready: false}; return; }
+  const market = E.market, midHist = E.midHist;
   const mid = A.mid, now = Date.now();
   midHist.push({t: now, p: mid});
   while (midHist.length && now - midHist[0].t > 7200e3) midHist.shift();
 
-  const {f5, f30} = flowStats();
-  const {L, S: SL, L30, S30} = liqStats();
+  const {f5, f30, mua30, ban30} = flowStats(E);
+  const {L, S: SL} = liqStats(E);
   const bookM = A.bids.reduce((s, r) => s + r.m, 0) + A.asks.reduce((s, r) => s + r.m, 0);
   const scale = Math.max(bookM, 1e5);
 
@@ -687,8 +712,8 @@ function analyze(A){
   const sFlow5  = clamp(f5 / (scale * 0.015), -1, 1);
 
   let tb = 0, ta = 0;
-  for (const r of A.bids){ if ((mid - r.p) / mid < 0.005) tb += r.m * wallTrust('b', r.p) / 100; }
-  for (const r of A.asks){ if ((r.p - mid) / mid < 0.005) ta += r.m * wallTrust('a', r.p) / 100; }
+  for (const r of A.bids){ if ((mid - r.p) / mid < 0.005) tb += r.m * wallTrust(E, 'b', r.p) / 100; }
+  for (const r of A.asks){ if ((r.p - mid) / mid < 0.005) ta += r.m * wallTrust(E, 'a', r.p) / 100; }
   const sBook = (tb + ta) > 0 ? (tb - ta) / (tb + ta) : 0;
 
   let sOi = 0;
@@ -745,8 +770,10 @@ function analyze(A){
     else if (R.h2 >= 0.03){ frameH = 2; cap = R.h2; }
     else if (R.h4){ frameH = 4; cap = R.h4; }
   }
-  const sup = bestWall(A.bids, 'b', mid, cap, true);
-  const res = bestWall(A.asks, 'a', mid, cap, false);
+  /* GIÁ VÀO / GIÁ CHỐT lấy từ SỔ RIÊNG OKX — đó là nơi lệnh thật sẽ khớp.
+     Tường chỉ tồn tại ở sàn khác thì trên OKX giá đi xuyên qua như không có gì. */
+  const sup = bestWall(E, A.bidsOkx, 'b', mid, cap, true);
+  const res = bestWall(E, A.asksOkx, 'a', mid, cap, false);
 
   /* ETA: tiền (đã lọc tin cậy) chắn giữa giá và mục tiêu ÷ tốc độ dòng tiền */
   let eta = null;
@@ -755,114 +782,84 @@ function analyze(A){
     const tgt = S < 0 ? sup : res;
     if (tgt && ((S < 0 && f30 < 0) || (S > 0 && f30 > 0))){
       let block = 0;
-      const rows = S < 0 ? A.bids : A.asks;
+      const rows = S < 0 ? A.bidsOkx : A.asksOkx;
       for (const r of rows){
         const between = S < 0 ? (r.p >= tgt.p && r.p < mid) : (r.p <= tgt.p && r.p > mid);
-        if (between) block += r.m * wallTrust(S < 0 ? 'b' : 'a', r.p) / 100;
+        if (between) block += r.m * wallTrust(E, S < 0 ? 'b' : 'a', r.p) / 100;
       }
       eta = Math.round(block / rate);
     }
   }
 
-  pred = {ready: true, S, conf, active: act.length, sup, res, cap, eta,
-          f5, f30, L, SL, mid, step: A.step, frameH, bookM, flowConflict, satNoConfirm};
+  /* warmLeft: 90 giây đầu chưa đủ dòng tiền để lọc lệnh ảo → chưa phát tín hiệu */
+  const warmLeft = Math.ceil((90000 - (now - E.engineStart)) / 1000);
+  /* CÓ TÍN HIỆU HAY KHÔNG — đúng bộ điều kiện cũ, chỉ gom lại một chỗ để bảng
+     LONG/SHORT và ô nhận định chi tiết luôn nói cùng một câu */
+  const phat = warmLeft <= 0 && Math.abs(S) >= 25 && act.length >= 2
+               && !flowConflict && !satNoConfirm && !!sup && !!res;
 
-  /* ---- SĂN ĐỈNH: chấm mức kiệt sức của cú pump (cho kèo short khoảng dài) ---- */
-  let maxMid30 = -Infinity, maxMid10 = -Infinity;
-  for (const x of midHist){
-    const age = now - x.t;
-    if (age <= 30 * 60e3 && x.p > maxMid30) maxMid30 = x.p;
-    if (age <= 10 * 60e3 && x.p > maxMid10) maxMid10 = x.p;
-  }
-  const run24 = (market.ref && market.ref.c24 > 0) ? mid / market.ref.c24 - 1 : null;
-  const run4 = (market.ref && market.ref.c4 > 0) ? mid / market.ref.c4 - 1 : null;
-  const thItems = [];
-  let thScore = 0;
-  const thAdd = (on, w, label) => { thItems.push({on: !!on, label}); if (on) thScore += w; };
-  thAdd(isFinite(maxMid30) && mid >= maxMid30 * 0.998 && f30 > 0 && f5 < 0.4 * (f30 / 6), 25,
-    `hụt hơi: giá sát đỉnh 30' nhưng lực mua 5' (${fmtSigned(f5)}) tụt so với nhịp trước (${fmtSigned(f30 / 6)}/5')`);
-  thAdd(dP25 !== null && dP25 > 0.01 && dOi25 !== null && dOi25 < -0.005, 20,
-    `long cũ chốt lời: giá ${dP25 !== null ? '+' + (dP25 * 100).toFixed(1) : '?'}%/25' mà OI ${dOi25 !== null ? (dOi25 * 100).toFixed(1) : '?'}%`);
-  thAdd(f8 !== null && f8 >= 0.0005, 15,
-    `funding dương nóng${f8 !== null ? ' ≈' + (f8 * 100).toFixed(3) + '%/8h' : ''} — long đông nghẹt, thuận short`);
-  thAdd(res && res.trust >= 55 && (res.p - mid) / mid < 0.004 && sFlow5 >= 0.3
-    && isFinite(maxMid10) && mid <= maxMid10 * 1.0005, 20,
-    'hấp thụ: mua nện vào kháng cự tin cao mà giá không thủng lên được');
-  thAdd(S30 > 25000 && SL < S30 * 0.1, 10,
-    'đợt cháy short đã tắt — nhiên liệu đẩy lên cạn dần');
-  thAdd((run24 !== null && run24 >= 0.25) || (run4 !== null && cap && run4 >= 2 * cap), 10,
-    `giá chạy vượt xa biên thường (24h ${run24 !== null ? (run24 >= 0 ? '+' : '') + (run24 * 100).toFixed(0) + '%' : '—'})`);
-  /* mục tiêu chốt xa: đỡ lớn trong 15%, đỡ sâu hơn trong 25%, chân cú pump 48h */
-  const farSup = bestWall(A.bids, 'b', mid, 0.15, true);
-  let deepSup = null;
-  if (farSup){
-    let bs2 = 0;
-    for (const r of A.bids){
-      if (r.p >= farSup.p * 0.995) continue;
-      const d = (mid - r.p) / mid;
-      if (d <= 0 || d > 0.25) continue;
-      const t2 = wallTrust('b', r.p);
-      const sc2 = r.m * (t2 / 100);
-      if (sc2 > bs2){ bs2 = sc2; deepSup = {p: r.p, m: r.m, trust: t2}; }
-    }
-  }
-  /* vùng VÀO short = tường bán tin cao gần nhất phía trên (kháng cự) */
-  const entryRes = bestWall(A.asks, 'a', mid, 0.15, false);
-  pred.top = {score: Math.round(thScore), items: thItems, farSup, deepSup, entryRes,
-    pumpLow: (market.pumpLow && market.pumpLow < mid * 0.97) ? market.pumpLow : null, f8};
+  E.pred = {ready: true, S, conf, active: act.length, sup, res, cap, eta,
+            f5, f30, L, SL, mid, step: A.step, frameH, bookM,
+            flowConflict, satNoConfirm, warmLeft, phat,
+            mua30, ban30, bbOkx: A.bbOkx, baOkx: A.baOkx,
+            sig: {f30: sFlow30, f5: sFlow5, bk: sBook, oi: sOi, fu: sFund, lq: sLiq},
+            exMask: EX.reduce((m, e) => m | (E.conns[e.key].state === 'live' ? E.conns[e.key].bit : 0), 0),
+            tuoiCoin: E.listTime ? (now - E.listTime) / 86400000 : null};
+  const pred = E.pred;
 
   /* mục tiêu TẦM XA: cùng hướng với máy nhưng mốc là TƯỜNG LỚN trong tầm 12%,
      tối thiểu cách 3% (gần hơn thì đã có vùng chốt nhanh lo) */
   if (Math.abs(S) >= 25 && act.length >= 2 && !flowConflict){
     const dirF = Math.sign(S);
-    const farW = dirF > 0 ? bestWall(A.asks, 'a', mid, 0.12, false)
-                          : bestWall(A.bids, 'b', mid, 0.12, true);
+    const farW = dirF > 0 ? bestWall(E, A.asksOkx, 'a', mid, 0.12, false)
+                          : bestWall(E, A.bidsOkx, 'b', mid, 0.12, true);
     const distF = farW ? Math.abs(farW.p - mid) / mid : 0;
     pred.far = (farW && distF >= 0.03) ? {p: farW.p, m: farW.m, trust: farW.trust, dir: dirF} : null;
   } else pred.far = null;
 
   /* ---- BẢN ĐỒ MỐC: tường lớn hai phía + độ trống phía sau ---- */
-  const decorate = (arr, rows, isBid) => arr.map((L, i) => {
+  const decorate = (arr, rows, isBid) => arr.map((L2, i) => {
     const nextP = arr[i + 1] ? arr[i + 1].p : null;
     let gap = 0;
     for (const r of rows){
-      const between = isBid ? (r.p < L.p && (nextP === null || r.p > nextP))
-                            : (r.p > L.p && (nextP === null || r.p < nextP));
+      const between = isBid ? (r.p < L2.p && (nextP === null || r.p > nextP))
+                            : (r.p > L2.p && (nextP === null || r.p < nextP));
       if (between) gap += r.m;
     }
     const tgtP = nextP !== null ? nextP : mid * (isBid ? 0.85 : 1.15);
-    return {p: L.p, m: L.m, trust: L.trust, ex: L.ex, gap, thin: gap < 0.5 * L.m, tgtP};
+    return {p: L2.p, m: L2.m, trust: L2.trust, ex: L2.ex, gap, thin: gap < 0.5 * L2.m, tgtP};
   });
   pred.levels = {
-    res: decorate(pickLevels(A.asks, 'a', mid, false), A.asks, false),
-    sup: decorate(pickLevels(A.bids, 'b', mid, true), A.bids, true)
+    res: decorate(pickLevels(E, A.asksOkx, 'a', mid, false), A.asksOkx, false),
+    sup: decorate(pickLevels(E, A.bidsOkx, 'b', mid, true), A.bidsOkx, true)
   };
 
   /* theo dõi VƯỢT mốc: phân biệt tường bị ĂN thật (vượt có lực) vs tường TỰ RÚT (bẫy) */
+  const lvlWatch = E.lvlWatch;
   for (const sideName of ['res', 'sup']){
     const ab = sideName === 'res' ? 'a' : 'b';
-    for (const L of pred.levels[sideName]){
-      const key = ab + ':' + L.p.toPrecision(6);
+    for (const L2 of pred.levels[sideName]){
+      const key = ab + ':' + L2.p.toPrecision(6);
       if (!lvlWatch[key]){
-        const w = wallBook[wallKey(ab, L.p)] || {};
-        lvlWatch[key] = {p: L.p, ab, m: L.m, thin: L.thin, tgtP: L.tgtP,
+        const w = E.wallBook[wallKey(ab, L2.p)] || {};
+        lvlWatch[key] = {p: L2.p, ab, m: L2.m, thin: L2.thin, tgtP: L2.tgtP,
                          fl0: w.fl || 0, pl0: w.pl || 0};
       }
       lvlWatch[key].seen = now;
     }
   }
-  if (lastMidForBrk !== null){
+  if (E.lastMidForBrk !== null){
     for (const key in lvlWatch){
       const W = lvlWatch[key];
       const up = W.ab === 'a';
-      const crossed = up ? (lastMidForBrk <= W.p && mid > W.p * 1.001)
-                         : (lastMidForBrk >= W.p && mid < W.p * 0.999);
+      const crossed = up ? (E.lastMidForBrk <= W.p && mid > W.p * 1.001)
+                         : (E.lastMidForBrk >= W.p && mid < W.p * 0.999);
       if (crossed){
-        const w = wallBook[wallKey(W.ab, W.p)];
+        const w = E.wallBook[wallKey(W.ab, W.p)];
         const dFl = w ? (w.fl || 0) - W.fl0 : 0;
         const dPl = w ? (w.pl || 0) - W.pl0 : 0;
         const clean = dFl > 0 && dPl === 0 ? true : (dPl > 0 ? false : null);
-        brkAlert = {t: now, warn: clean === false,
+        E.brkAlert = {t: now, warn: clean === false,
           txt: (up ? '⚡ Vừa VƯỢT kháng cự ' : '⚡ Vừa THỦNG đỡ ') + fmtPrice(W.p, A.step)
             + (clean === true ? ' — tường bị ĂN bằng tiền thật → cú vượt có lực'
                : clean === false ? ' — tường TỰ RÚT trước khi giá tới → coi chừng bẫy'
@@ -871,90 +868,89 @@ function analyze(A){
       } else if (now - (W.seen || 0) > 600e3) delete lvlWatch[key];
     }
   }
-  lastMidForBrk = mid;
+  E.lastMidForBrk = mid;
 }
 
-/* ---- panel BẢN ĐỒ MỐC ---- */
-function renderLvl(){
-  const P = pred;
-  if (!P.ready || !P.levels){
-    $('lmRes').innerHTML = '<div class="thRow">Đang thu thập dữ liệu…</div>';
-    $('lmSup').innerHTML = ''; $('lmMid').textContent = '';
-    $('lmAlert').style.display = 'none';
-    return;
-  }
-  const row = (L, i, isRes) => {
-    const name = (isRes ? 'KHÁNG CỰ ' : 'ĐỠ ') + (i + 1);
-    const run = L.thin
-      ? ` — ${isRes ? 'vượt' : 'thủng'} → <b class="w1">TRỐNG</b> tới ${fmtPrice(L.tgtP, P.step)} (${fmtPct((L.tgtP / P.mid - 1) * 100)})`
-      : ` — sau lưng còn ${fmtMoney(L.gap)} chắn`;
-    return `<div class="thRow on"><span class="${isRes ? 'cDn' : 'cUp'}">${name}</span> · <b>${fmtPrice(L.p, P.step)}</b> (${fmtPct((L.p / P.mid - 1) * 100)}) · ${fmtMoney(L.m)} · tin ${L.trust}${bitCount(L.ex || 0) <= 1 ? ' · <span class="w1">⚠1 sàn</span>' : ''}${run}</div>`;
+/* ==================================================================
+   THANH LÝ OKX — MỘT socket dùng chung cho toàn sàn
+   Kênh liquidation-orders nhận theo instType chứ không theo từng coin, nên chỉ cần
+   ĐÚNG MỘT subscription rồi định tuyến về engine tương ứng theo instId.
+   Vá lỗ hổng lớn nhất hiện tại: tín hiệu sLiq (trọng số 0.20 — nặng thứ hai trong
+   6 tín hiệu) trước đây chỉ lấy từ forceOrder của Binance, tức không có một byte
+   nào từ chính sàn mà lệnh được đặt.
+   ================================================================== */
+let wsLiq = null, lqTimers = [];
+function moSocketThanhLy(){
+  lqTimers.forEach(clearInterval); lqTimers = [];
+  let ws;
+  try { ws = new WebSocket('wss://ws.okx.com:8443/ws/v5/public'); }
+  catch(e){ setTimeout(moSocketThanhLy, 5000); return; }
+  wsLiq = ws;
+  ws.onopen = () => {
+    ws.send(JSON.stringify({op:'subscribe', args:[{channel:'liquidation-orders', instType:'SWAP'}]}));
+    lqTimers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
   };
-  $('lmRes').innerHTML = P.levels.res.map((L, i) => ({L, i})).reverse()
-    .map(x => row(x.L, x.i, true)).join('');
-  $('lmSup').innerHTML = P.levels.sup.map((L, i) => row(L, i, false)).join('');
-  $('lmMid').textContent = `── giá hiện tại ${fmtPrice(P.mid, P.step / 10)} ──`;
-  let alertHtml = '';
-  if (brkAlert && Date.now() - brkAlert.t < 600e3)
-    alertHtml = `<div class="${brkAlert.warn ? 'w1' : 'cUp'}">${brkAlert.txt}</div>`;
-  $('lmAlert').innerHTML = alertHtml;
-  $('lmAlert').style.display = alertHtml ? '' : 'none';
+  ws.onmessage = e => {
+    if (e.data === 'pong') return;
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    if (!d.data || !d.arg || d.arg.channel !== 'liquidation-orders') return;
+    for (const row of d.data){
+      const inst = row.instId || '';
+      if (!inst.endsWith('-USDT-SWAP')) continue;
+      const E = engines[inst.slice(0, -10)];
+      if (!E) continue;                       /* coin không nằm trong tập theo dõi */
+      const ctVal = E.conns.okx.qMul || 1;
+      /* payload gói các lệnh trong mảng details; phòng cả trường hợp phẳng */
+      const ds = Array.isArray(row.details) ? row.details : [row];
+      for (const t of ds){
+        const px = parseFloat(t.bkPx), sz = parseFloat(t.sz);
+        if (!isFinite(px) || !isFinite(sz)) continue;
+        /* posSide = phe BỊ thanh lý. Không có thì suy từ side: hệ thống BÁN ra để
+           tất toán một vị thế LONG, và ngược lại. */
+        const phe = t.posSide === 'long' || t.posSide === 'short'
+          ? t.posSide : (t.side === 'sell' ? 'long' : 'short');
+        pushLiq(E, phe, px * sz * ctVal);
+      }
+    }
+  };
+  ws.onclose = () => { if (wsLiq === ws) setTimeout(moSocketThanhLy, 3000); };
 }
-function resetEngine(sym, g){
-  predTimers.forEach(clearInterval); predTimers = [];
-  flowSec = []; liqs = []; midHist = [];
-  market = {funding: null, fundH: 8, oi: null, oiHist: [], atr4h: null};
-  pred = {ready: false};
-  lvlWatch = {}; brkAlert = null; lastMidForBrk = null;
-  engineStart = Date.now();
-  wallBook = {};   /* đổi coin = quên sạch tường của coin cũ */
-  pollMarket(sym, g); pollCandles(sym, g);
-  predTimers.push(setInterval(() => { if (g === gen) pollMarket(sym, g); }, 60000));
-  predTimers.push(setInterval(() => { if (g === gen) pollCandles(sym, g); }, 900000));
+moSocketThanhLy();
+
+/* ==================================================================
+   VÒNG ĐỜI ENGINE
+   ================================================================== */
+function batDauEngine(sym, thuTu){
+  if (engines[sym]) return engines[sym];
+  const E = taoEngine(sym);
+  engines[sym] = E;
+  E.gen++;
+  const g = E.gen;
+  E.engineStart = Date.now();
+  /* rải lệnh gọi REST theo thứ tự coin để 8 engine không bắn cùng lúc vào OKX */
+  const tre = (thuTu || 0) * 400;
+  E.timers.push(setTimeout(() => { if (g === E.gen){ pollMarket(E, g); pollCandles(E, g); } }, tre));
+  E.timers.push(setInterval(() => { if (g === E.gen) pollMarket(E, g); }, 60000));
+  E.timers.push(setInterval(() => { if (g === E.gen) pollCandles(E, g); }, 900000));
+  startBinance(E, g, false);
+  startBybit(E, g, 0);
+  startOkx(E, g);
+  startBitget(E, g, 0);
+  return E;
 }
-/* ---- panel SĂN ĐỈNH ---- */
-function renderTop(){
-  const T = pred.top;
-  if (!pred.ready || !T){
-    $('thScore').textContent = '—'; $('thScore').className = '';
-    $('thList').innerHTML = '<div class="thRow">Đang thu thập dữ liệu (cần dòng tiền + nến 48h)…</div>';
-    $('thTgt').textContent = ''; $('thFund').textContent = '';
-    return;
-  }
-  $('thScore').textContent = T.score + '/100';
-  /* ngưỡng hiệu chỉnh theo băng ghi điểm thật: đèn funding/thanh lý gần như chết trên
-     coin nhỏ nên trần thực tế ~45-65 — đỏ từ 45, vàng từ 25 */
-  $('thScore').className = T.score >= 45 ? 'hot' : T.score >= 25 ? 'warm' : '';
-  $('thList').innerHTML = T.items.map(i =>
-    `<div class="thRow${i.on ? ' on' : ''}">${i.on ? '<span class="dotOn">●</span>' : '<span class="dotOff">○</span>'} ${i.label}</div>`
-  ).join('');
-  const mid = pred.mid;
-  const tgt = [];
-  if (T.entryRes){
-    const oneEx = bitCount(T.entryRes.ex || 0) <= 1;
-    tgt.push(`<span class="lbl">VÙNG VÀO short (kháng cự)</span> ${fmtPrice(T.entryRes.p, pred.step)} (${fmtPct((T.entryRes.p / mid - 1) * 100)}) · tường bán ${fmtMoney(T.entryRes.m)} · tin ${T.entryRes.trust}${oneEx ? ' · <span class="w1">⚠1 sàn</span>' : ''}<br>`);
-  }
-  if (T.farSup) tgt.push(`<span class="lbl">đỡ lớn</span> ${fmtPrice(T.farSup.p, pred.step)} (${fmtPct((T.farSup.p / mid - 1) * 100)}) · tin ${T.farSup.trust}`);
-  if (T.deepSup) tgt.push(`<span class="lbl">đỡ sâu</span> ${fmtPrice(T.deepSup.p, pred.step)} (${fmtPct((T.deepSup.p / mid - 1) * 100)})`);
-  if (T.pumpLow) tgt.push(`<span class="lbl">chân pump</span> ${fmtPrice(T.pumpLow, pred.step)} (${fmtPct((T.pumpLow / mid - 1) * 100)})`);
-  $('thTgt').innerHTML = tgt.length
-    ? (T.entryRes ? tgt[0] + '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.slice(1).join(' &nbsp;·&nbsp; ')
-                  : '<span class="lbl">Mục tiêu chốt xa:</span> ' + tgt.join(' &nbsp;·&nbsp; '))
-    : '';
-  let fundTxt = '';
-  if (T.f8 !== null && T.f8 !== undefined && isFinite(T.f8)){
-    const daily = T.f8 * 3 * 100;
-    fundTxt = T.f8 > 0
-      ? `Gồng short được NHẬN funding ≈ ${daily.toFixed(2)}%/ngày`
-      : `Gồng short TRẢ funding ≈ ${Math.abs(daily).toFixed(2)}%/ngày — tính vào giá vốn`;
-  }
-  $('thFund').textContent = fundTxt;
+function dungEngine(sym){
+  const E = engines[sym];
+  if (!E) return;
+  E.gen++;                                   /* mọi callback cũ tự chết */
+  for (const k in E.conns) clearConn(E.conns[k]);
+  E.timers.forEach(t => { clearInterval(t); clearTimeout(t); });
+  E.timers = [];
+  delete engines[sym];
 }
 
-/* nhịp phân tích: 2 giây/lần */
-setInterval(() => { const A = aggregate(); updateWalls(A); analyze(A); }, 2000);
-
-/* ---------- GỘP & HIỂN THỊ ---------- */
+/* ==================================================================
+   GỘP SỔ LỆNH
+   ================================================================== */
 function niceStep(x){
   if (!(x > 0)) return 0.0001;
   const e = Math.floor(Math.log10(x));
@@ -966,16 +962,12 @@ function fmtPrice(p, step){
   const d = Math.min(12, Math.max(0, -Math.floor(Math.log10(step))));
   return p.toFixed(d);
 }
-function fmtQty(x){
-  if (x >= 1e9) return (x/1e9).toFixed(2) + 'B';
-  if (x >= 1e6) return (x/1e6).toFixed(2) + 'M';
-  if (x >= 1e3) return (x/1e3).toFixed(1) + 'K';
-  if (x < 0.01) return x.toPrecision(2);
-  return x.toFixed(x < 10 ? 2 : 0);
-}
 function fmtMoney(x){ return '$' + Math.round(x).toLocaleString('en-US'); }
+function fmtPct(x){ return (x >= 0 ? '+' : '') + x.toFixed(2) + '%'; }
+function fmtSigned(x){ return (x >= 0 ? '+' : '-') + fmtMoney(Math.abs(x)); }
 
-function aggregate(){
+function aggregate(E){
+  const conns = E.conns;
   /* chống sàn lệch hệ số: lấy sàn live đầu tiên (ưu tiên Binance) làm mốc,
      sàn nào giá giữa lệch >15% so với mốc thì loại khỏi phép gộp */
   let ref = null;
@@ -994,21 +986,28 @@ function aggregate(){
   }
 
   let bb = -Infinity, ba = Infinity;
+  /* best bid/ask RIÊNG CỦA OKX — hàng đầu của bids/asks trả về là mốc ĐÃ GOM theo
+     step và đã lọc lệnh bụi, KHÔNG phải đỉnh sổ thật. Thiếu hai số này thì spread
+     thật không tính được và mọi cột giá trong bảng log sẽ bị điền bằng mid. */
+  let bbOkx = null, baOkx = null;
   const allB = [], allA = [];
   for (const k in conns){
     const c = conns[k];
     if (c.state !== 'live' || c.excluded) continue;
+    const laOkx = c.key === 'okx';
     for (const [p, q] of c.bids){
       const pp = parseFloat(p) * c.pMul, qq = q * c.qMul;
       if (!(qq > 0) || !(pp > 0)) continue;
       allB.push([pp, qq, c.bit]);
       if (pp > bb) bb = pp;
+      if (laOkx && (bbOkx === null || pp > bbOkx)) bbOkx = pp;
     }
     for (const [p, q] of c.asks){
       const pp = parseFloat(p) * c.pMul, qq = q * c.qMul;
       if (!(qq > 0) || !(pp > 0)) continue;
       allA.push([pp, qq, c.bit]);
       if (pp < ba) ba = pp;
+      if (laOkx && (baOkx === null || pp < baOkx)) baOkx = pp;
     }
   }
   if (!allB.length && !allA.length) return null;
@@ -1021,261 +1020,356 @@ function aggregate(){
   let span = (isFinite(lo) && isFinite(hi)) ? hi - lo : 0;
   if (!(span > 0)) span = mid * 0.002;
   const step = niceStep(span / 80);
+  /* Gom mốc: mỗi bucket giữ TIỀN GỘP 4 SÀN (m) và TIỀN RIÊNG CỦA OKX (mOkx).
+     Lý do phải tách: chủ dự án đặt lệnh trên OKX, nên một "tường" 80% nằm ở Binance là
+     tường KHÔNG chặn được giá trên OKX — đặt chốt lời ở đó là đặt vào chỗ trống. */
+  const bitOkx = conns.okx.bit;
   const bMap = new Map(), aMap = new Map();
   for (const [p, q, bit] of allB){
     const key = Math.floor(p / step + 1e-9);
-    const o = bMap.get(key) || {q:0, m:0, ex:0};
+    const o = bMap.get(key) || {q:0, m:0, ex:0, mOkx:0};
     o.q += q; o.m += p * q; o.ex |= bit;
+    if (bit === bitOkx) o.mOkx += p * q;
     bMap.set(key, o);
   }
   for (const [p, q, bit] of allA){
     const key = Math.ceil(p / step - 1e-9);
-    const o = aMap.get(key) || {q:0, m:0, ex:0};
+    const o = aMap.get(key) || {q:0, m:0, ex:0, mOkx:0};
     o.q += q; o.m += p * q; o.ex |= bit;
+    if (bit === bitOkx) o.mOkx += p * q;
     aMap.set(key, o);
   }
   /* không giới hạn số mốc CÓ NGHĨA — nhưng lọc bỏ mốc rác (lệnh bụi vặt làm loạn bảng):
      ẩn mốc dưới 0.4% tường lớn nhất và dưới $150 */
   const bids0 = [...bMap.entries()].sort((x, y) => y[0] - x[0])
-    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex}));
+    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex, mOkx: o.mOkx}));
   const asks0 = [...aMap.entries()].sort((x, y) => x[0] - y[0])
-    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex}));
+    .map(([k, o]) => ({p: k * step, q: o.q, m: o.m, ex: o.ex, mOkx: o.mOkx}));
   const maxBucket = Math.max(1, ...bids0.map(r => r.m), ...asks0.map(r => r.m));
   const dustTh = Math.max(150, 0.004 * maxBucket);
   const bids = bids0.filter(r => r.m >= dustTh);
   const asks = asks0.filter(r => r.m >= dustTh);
-  return {bids, asks, mid, step};
+
+  /* Sổ RIÊNG OKX — dùng để chọn giá vào / giá chốt và vẽ bản đồ mốc.
+     `m` là tiền THẬT trên OKX (thứ có thể khớp được), còn `ex` vẫn giữ bitmask gộp 4 sàn
+     để biết mốc đó có được sàn khác xác nhận hay chỉ mình OKX có. Cùng `step` với sổ gộp
+     nên khoá tra `wallTrust` khớp nhau, không phải làm gì thêm. */
+  const maxOkx = Math.max(1, ...bids0.map(r => r.mOkx), ...asks0.map(r => r.mOkx));
+  const dustOkx = Math.max(150, 0.004 * maxOkx);
+  const loc = arr => arr.filter(r => r.mOkx >= dustOkx)
+    .map(r => ({p: r.p, m: r.mOkx, ex: r.ex, mGop: r.m}));
+  return {bids, asks, bidsOkx: loc(bids0), asksOkx: loc(asks0), mid, step, bbOkx, baOkx};
 }
 
-function rowHtml(r, side, maxM, isWall, step){
-  const w = Math.max(1, Math.round(r.m / maxM * 100));
-  let tag = '';
-  if (isWall){
-    /* tường lớn chỉ có trên 1 sàn + chưa từng bị giá thử → nghi đạo cụ */
-    const wb = wallBook[wallKey(side === 'ask' ? 'a' : 'b', r.p)];
-    const tested = wb && (wb.sv > 0 || (wb.fl || 0) > 0);
-    const oneEx = bitCount(r.ex || 0) <= 1;
-    tag = (oneEx && !tested)
-      ? '<span class="wl w1">← tường ⚠1 sàn chưa thử</span>'
-      : '<span class="wl">← tường</span>';
+/* nhịp phân tích: 2 giây/lần, chạy cho TẤT CẢ engine đang theo dõi */
+setInterval(() => {
+  for (const sym in engines){
+    const E = engines[sym];
+    const A = aggregate(E);
+    updateWalls(E, A);
+    analyze(E, A);
+    sinhKeo(E);
   }
-  return `<div class="row ${side}">
-    <div class="p">${fmtPrice(r.p, step)}</div>
-    <div class="q">${fmtQty(r.q)}</div>
-    <div class="m">${fmtMoney(r.m)}</div>
-    <div class="barwrap"><div class="bar" style="width:${w}%"></div>${tag}</div>
-  </div>`;
-}
-
-function render(){
-  const A = aggregate();
-  if (!A){
-    $('net').textContent = '—'; $('net').className = '';
-    $('buyT').textContent = '—'; $('sellT').textContent = '—';
-    $('asks').innerHTML = ''; $('bids').innerHTML = '';
-    $('midPrice').textContent = '—';
-    $('pLean').className = 'neutral';
-    $('pLean').textContent = '● Đang chờ dữ liệu…';
-    $('pGrid').style.display = 'none';
-    $('pBasis').textContent = '';
-    $('pAlert').style.display = 'none';
-    $('chg').textContent = '';
-    $('thScore').textContent = '—'; $('thScore').className = '';
-    $('thList').innerHTML = ''; $('thTgt').textContent = ''; $('thFund').textContent = '';
-    $('lmRes').innerHTML = ''; $('lmSup').innerHTML = '';
-    $('lmMid').textContent = ''; $('lmAlert').style.display = 'none';
-    const anyTrying = Object.values(conns).some(c => c.state === 'wait');
-    $('empty').style.display = 'block';
-    $('empty').textContent = anyTrying ? 'Đang kết nối các sàn…' : 'Không sàn nào có cặp này — kiểm tra lại mã coin.';
-    return;
-  }
-  $('empty').style.display = 'none';
-
-  const buyM = A.bids.reduce((s, r) => s + r.m, 0);
-  const sellM = A.asks.reduce((s, r) => s + r.m, 0);
-  const net = buyM - sellM;
-  $('buyT').textContent = fmtMoney(buyM);
-  $('sellT').textContent = fmtMoney(sellM);
-  $('net').textContent = (net >= 0 ? '+' : '-') + fmtMoney(Math.abs(net)).slice(0);
-  $('net').className = net >= 0 ? 'pos' : 'neg';
-
-  const maxM = Math.max(1, ...A.bids.map(r => r.m), ...A.asks.map(r => r.m));
-  const wallA = A.asks.reduce((mx, r) => r.m > mx.m ? r : mx, {m:-1});
-  const wallB = A.bids.reduce((mx, r) => r.m > mx.m ? r : mx, {m:-1});
-
-  /* bên bán: mốc xa trên cùng, mốc sát giá ngay trên vạch giữa */
-  $('asks').innerHTML = A.asks.slice().reverse()
-    .map(r => rowHtml(r, 'ask', maxM, r === wallA, A.step)).join('');
-  $('bids').innerHTML = A.bids
-    .map(r => rowHtml(r, 'bid', maxM, r === wallB, A.step)).join('');
-  $('midPrice').textContent = fmtPrice(A.mid, A.step / 10);
-
-  /* dải % biến động — biết coin đang ở đoạn nào của cú pump/dump */
-  if (market.ref){
-    const one = (label, ref) => {
-      if (!ref || !(ref > 0)) return '';
-      const chg = (A.mid / ref - 1) * 100;
-      return `${label} <b class="${chg >= 0 ? 'up' : 'dn'}">${(chg >= 0 ? '+' : '') + chg.toFixed(1)}%</b>`;
-    };
-    $('chg').innerHTML = [one('1h', market.ref.c1), one('4h', market.ref.c4), one('24h', market.ref.c24)]
-      .filter(Boolean).join(' &nbsp;·&nbsp; ');
-  } else $('chg').textContent = '';
-
-  renderPredict(A, buyM, sellM, wallA, wallB);
-  renderLvl();
-  renderTop();
-
-  /* đổi coin xong thì tự cuộn tới vạch giá hiện tại */
-  if (needScroll){
-    needScroll = false;
-    $('mid').scrollIntoView({block:'center'});
-  }
-}
-
-/* ---------- Ô NHẬN ĐỊNH ---------- */
-function fmtPct(x){ return (x >= 0 ? '+' : '') + x.toFixed(2) + '%'; }
-
-function tRow(label, price, pct, why){
-  return `<div class="prow"><div class="pl">${label}</div><div class="pp">${price}</div><div class="pc">${pct}</div><div class="pw">${why}</div></div>`;
-}
-
-function fmtSigned(x){ return (x >= 0 ? '+' : '-') + fmtMoney(Math.abs(x)); }
-
-function renderPredict(A, buyM, sellM, wallA, wallB){
-  const lean = $('pLean'), grid = $('pGrid');
-  const P = pred;
-  const warmLeft = Math.ceil((90000 - (Date.now() - engineStart)) / 1000);
-
-  /* dòng căn cứ + cảnh báo: luôn hiện số liệu thật đang đo */
-  let basis = '', alerts = [];
-  if (P.ready){
-    basis = `Khung ${P.frameH}h (tự chọn theo độ nóng) · Dòng tiền 30': ${fmtSigned(P.f30)} · 5': ${fmtSigned(P.f5)}`
-      + ` · funding ${market.funding !== null ? (market.funding * 100).toFixed(3) + '%/' + (market.fundH || 8) + 'h' : '—'}`
-      + ` · thanh lý 5': long ${fmtMoney(P.L)} / short ${fmtMoney(P.SL)}`
-      + ` · biên ${P.frameH}h ${P.cap ? '±' + (P.cap * 100).toFixed(1) + '%' : '—'}`;
-    const fH = market.fundH || 8;
-    const f8a = (market.funding !== null && isFinite(market.funding)) ? market.funding * (8 / fH) : null;
-    if (f8a !== null && Math.abs(f8a) >= 0.0005){
-      alerts.push(`⚠ Funding ${(market.funding * 100).toFixed(3)}%/${fH}h (≈${(f8a * 100).toFixed(3)}%/8h) — phe ${f8a < 0 ? 'SHORT' : 'LONG'} đang đông nghẹt và trả phí, rủi ro squeeze ${f8a < 0 ? 'LÊN' : 'XUỐNG'} cao`);
-    }
-    if (P.bookM < 300000)
-      alerts.push(`⚠ Sổ lệnh mỏng (tổng ${fmtMoney(P.bookM)}) — coin dễ bị đạo diễn, mọi tín hiệu kém tin cậy`);
-  }
-  $('pBasis').textContent = basis;
-  $('pAlert').innerHTML = alerts.join('<br>');
-  $('pAlert').style.display = alerts.length ? '' : 'none';
-
-  if (!P.ready || warmLeft > 0){
-    lean.className = 'neutral';
-    lean.textContent = `● Đang thu thập dòng tiền để lọc lệnh ảo… ${warmLeft > 0 ? '(' + warmLeft + 's)' : ''}`;
-    grid.style.display = 'none';
-    return;
-  }
-
-  const nb = Math.max(1, Math.min(5, Math.round(P.conf / 20)));
-  const blocks = '█'.repeat(nb) + '░'.repeat(5 - nb);
-
-  if (Math.abs(P.S) < 25 || P.active < 2 || P.flowConflict || P.satNoConfirm){
-    lean.className = 'neutral';
-    lean.innerHTML = (P.flowConflict
-      ? `● CHƯA RÕ HƯỚNG — dòng tiền 5' đang NGƯỢC dòng 30' (thị trường đảo nhịp), đứng ngoài`
-      : P.satNoConfirm
-      ? `● CHƯA RÕ HƯỚNG — dòng tiền kịch kim nhưng sổ lệnh & OI không xác nhận (nghi đuổi đuôi cú chạy), đứng ngoài`
-      : '● CHƯA RÕ HƯỚNG — tín hiệu chưa đồng thuận, nên đứng ngoài')
-      + ` <span class="conf">điểm ${Math.round(P.S)}</span>`;
-    grid.style.display = 'none';
-    return;
-  }
-
-  const isLong = P.S > 0;
-  lean.className = isLong ? 'long' : 'short';
-  lean.innerHTML = (isLong ? '⬆ NGHIÊNG VỀ LONG' : '⬇ NGHIÊNG VỀ SHORT')
-    + ` <span class="conf">điểm ${Math.round(P.S)} · tin cậy ${blocks} ${P.conf}%</span>`;
-
-  const mid = P.mid, cap = P.cap;
-  let html = '';
-  if (P.res){
-    html += tRow('<span class="up">NẾU LONG ↗</span>&nbsp; vùng chốt',
-      fmtPrice(P.res.p, A.step), fmtPct((P.res.p / mid - 1) * 100),
-      `tường bán ${fmtMoney(P.res.m)} · tin ${P.res.trust}/100 · ${wallInfo('a', P.res.p)}`
-      + (bitCount(P.res.ex || 0) <= 1 ? ' · <span class="w1">⚠ chỉ 1 sàn</span>' : ''));
-  }
-  html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; trần ${P.frameH}h`,
-    fmtPrice(mid * (1 + cap), A.step), fmtPct(cap * 100),
-    `biên dao động ${P.frameH}h điển hình của coin này`);
-  html += '<div class="psep"></div>';
-  if (P.sup){
-    html += tRow('<span class="dn">NẾU SHORT ↘</span>&nbsp; vùng chốt',
-      fmtPrice(P.sup.p, A.step), fmtPct((P.sup.p / mid - 1) * 100),
-      `tường mua ${fmtMoney(P.sup.m)} · tin ${P.sup.trust}/100 · ${wallInfo('b', P.sup.p)}`
-      + (bitCount(P.sup.ex || 0) <= 1 ? ' · <span class="w1">⚠ chỉ 1 sàn</span>' : ''));
-  }
-  html += tRow(`&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sàn ${P.frameH}h`,
-    fmtPrice(mid * (1 - cap), A.step), fmtPct(-cap * 100),
-    `biên dao động ${P.frameH}h điển hình của coin này`);
-  if (P.eta !== null && P.eta >= 0 && P.eta < 600){
-    html += '<div class="psep"></div>';
-    html += tRow('⏱ ETA dòng tiền', P.eta + ' phút', '',
-      `chạm vùng ${isLong ? 'chốt long' : 'chốt short'} nếu giữ nhịp hiện tại`);
-  }
-  if (P.far){
-    html += '<div class="psep"></div>';
-    html += tRow((P.far.dir > 0 ? '<span class="up">TẦM XA ↗</span>' : '<span class="dn">TẦM XA ↘</span>') + '&nbsp; (hạn 24h)',
-      fmtPrice(P.far.p, A.step), fmtPct((P.far.p / mid - 1) * 100),
-      `tường ${P.far.dir > 0 ? 'bán' : 'mua'} lớn ${fmtMoney(P.far.m)} · tin ${P.far.trust} · kèo dài, chấm sổ riêng`);
-  }
-  grid.innerHTML = html;
-  grid.style.display = '';
-}
-
-setInterval(render, 100);
+}, 2000);
 
 /* canh chừng: sàn đang live mà im lặng quá lâu (quá cả chu kỳ ping/pong) thì báo chờ */
 setInterval(() => {
   const now = Date.now();
-  for (const k in conns){
-    const c = conns[k];
-    if (c.state === 'live' && now - c.lastMsg > 35000) setState(c, 'wait', 'mất dữ liệu — chờ nhận lại');
+  for (const sym in engines){
+    for (const k in engines[sym].conns){
+      const c = engines[sym].conns[k];
+      if (c.state === 'live' && now - c.lastMsg > 35000) setState(c, 'wait', 'mất dữ liệu — chờ nhận lại');
+    }
   }
 }, 3000);
 
-let curSym = '';
-let needScroll = true;
-function start(force){
-  let sym = $('sym').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  sym = sym.replace(/USDT$/, '');
-  if (!sym) return;
-  if (!force && sym === curSym) return;
-  curSym = sym;
-  needScroll = true;
-  gen++;
-  const g = gen;
-  for (const k in conns) clearConn(conns[k]);
-  resetEngine(sym, g);
-  document.title = sym + ' — Sổ Lệnh Gộp';
-  startBinance(sym, g, false);
-  startBybit(sym, g, 0);
-  startOkx(sym, g);
-  startBitget(sym, g, 0);
+/* ==================================================================
+   HIỂN THỊ — hai bảng LONG / SHORT + khối chi tiết của coin đang chọn
+   ================================================================== */
+
+/* GIÁ VÀO / GIÁ CHỐT — không phát minh logic mới, chỉ đọc lại đúng hai tường
+   mà máy đã chọn: kèo LONG vào tại tường ĐỠ dưới và chốt tại tường KHÁNG trên;
+   kèo SHORT thì ngược lại. */
+/* HỆ SỐ CẮT LỖ: cắt lỗ đặt VƯỢT QUA tường vào một khoảng bằng ngần này lần biên
+   khung. Đây là THAM SỐ TỰ CHỌN, chưa có dữ liệu nào chứng minh 0.30 là đúng —
+   phải đo lại khi có sổ log rồi mới chỉnh. */
+const HE_SO_CAT = 0.30;
+
+/* Hash TỰ SINH từ chính bộ tham số quyết định. Tự sinh nên không bao giờ quên
+   cập nhật khi chỉnh trọng số — mà trộn dữ liệu trước/sau một lần chỉnh là mọi
+   so sánh về sau thành rác. Đổi bất kỳ số nào dưới đây là hash tự đổi theo. */
+const VER_TRONG_SO = (() => {
+  const ts = [0.30, 0.15, 0.15, 0.10, 0.10, 0.20,   /* 6 trọng số */
+              25, 2, 0.3, 0.99, 0.2,                /* 4 chốt chặn */
+              HE_SO_CAT, NGUONG_GHI, 0.005, 0.15];  /* cắt lỗ, ngưỡng ghi, dải sổ, tầm tường */
+  let h = 5381;
+  for (const x of ts){ const str = String(x); for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0; }
+  return 'v' + h.toString(36);
+})();
+
+function keoCua(E){
+  const P = E.pred;
+  if (!P.ready || !P.phat) return null;
+  const isLong = P.S > 0;
+  const vao = isLong ? P.sup : P.res, chot = isLong ? P.res : P.sup;
+  /* Cắt lỗ = vượt qua tường vào. Vào tại tường đỡ mà tường đó thủng nghĩa là
+     giả định gốc sai — đó mới là điểm vô hiệu, không phải tường đối diện. */
+  const cat = vao.p + (isLong ? -1 : 1) * HE_SO_CAT * P.cap * P.mid;
+  const dChot = Math.abs(chot.p - vao.p), dCat = Math.abs(vao.p - cat);
+  return {
+    sym: E.sym, isLong, S: P.S, conf: P.conf, mid: P.mid, step: P.step,
+    vao, chot, cat,
+    rr: dCat > 0 ? dChot / dCat : null,
+    /* MỐC SO SÁNH: với giá đi ngẫu nhiên không xu hướng, xác suất chạm chốt trước
+       khi chạm cắt lỗ xấp xỉ đúng bằng tỷ lệ này. Mọi tỷ lệ thắng đo được về sau
+       phải so với con số NÀY chứ không phải với 50%. */
+    baseline: (dChot + dCat) > 0 ? dCat / (dChot + dCat) : null
+  };
 }
+
+function trustChip(t){
+  return `<span class="trust ${t >= 55 ? 'hi' : t >= 35 ? 'mid' : ''}">tin ${t}</span>`;
+}
+
+/* MỘT THẺ COIN = toàn bộ thông tin của kèo đó, tự chứa: đầu thẻ, cảnh báo,
+   vùng giao dịch (vào / chốt / trần / sàn / ETA / tầm xa), dòng căn cứ, bản đồ mốc.
+   Gộp hết vào đây vì các panel chi tiết riêng đã bị bỏ khỏi giao diện. */
+function theCoin(E, K){
+  const P = E.pred, market = E.market, step = P.step, mid = P.mid;
+  const isLong = K.isLong, vao = K.vao, chot = K.chot;
+  const fH = market.fundH || 8;
+
+  /* ---- đầu thẻ ---- */
+  let chg = '';
+  if (market.ref && market.ref.c24 > 0){
+    const c = (mid / market.ref.c24 - 1) * 100;
+    chg = `<span class="ccChg">24h <b class="${c >= 0 ? 'up' : 'dn'}">${(c >= 0 ? '+' : '') + c.toFixed(1)}%</b></span>`;
+  }
+  const nb = Math.max(1, Math.min(5, Math.round(P.conf / 20)));
+  let h = `<div class="ccHead">
+    <span class="ccSym">${E.sym}</span>
+    <span class="ccPrice">${fmtPrice(mid, step / 10)}</span>
+    ${chg}
+    <span class="ccS ${isLong ? 'up' : 'dn'}">${P.S >= 0 ? '+' : ''}${Math.round(P.S)}</span>
+    <span class="ccConf">tin cậy ${'█'.repeat(nb)}${'░'.repeat(5 - nb)} ${P.conf}%</span>
+  </div>`;
+
+  /* ---- cảnh báo ---- */
+  const canhBao = [];
+  const f8 = (market.funding !== null && isFinite(market.funding)) ? market.funding * (8 / fH) : null;
+  if (f8 !== null && Math.abs(f8) >= 0.0005)
+    canhBao.push(`⚠ Funding ${(market.funding * 100).toFixed(3)}%/${fH}h — phe ${f8 < 0 ? 'SHORT' : 'LONG'} đông nghẹt, rủi ro squeeze ${f8 < 0 ? 'LÊN' : 'XUỐNG'}`);
+  if (P.bookM < 300000)
+    canhBao.push(`⚠ Sổ lệnh mỏng (${fmtMoney(P.bookM)}) — coin dễ bị đạo diễn, mọi tín hiệu kém tin cậy`);
+  if (P.tuoiCoin !== null && P.tuoiCoin < 7)
+    canhBao.push(`⚠ Coin mới niêm yết ${P.tuoiCoin.toFixed(0)} ngày — chưa đủ lịch sử để biên khung và điểm tin tường có nghĩa`);
+  if (canhBao.length) h += `<div class="ccWarn">${canhBao.join('<br>')}</div>`;
+  if (E.brkAlert && Date.now() - E.brkAlert.t < 600e3)
+    h += `<div class="ccBrk ${E.brkAlert.warn ? 'w1' : 'cUp'}">${E.brkAlert.txt}</div>`;
+
+  /* ---- vùng giao dịch ---- */
+  const zRow = (tag, cls, W, why) => `<div class="zRow">
+    <div class="zTop"><span class="zTag ${cls}">${tag}</span>
+      <span class="zP">${fmtPrice(W.p, step)}</span>
+      <span class="zPct">${fmtPct((W.p / mid - 1) * 100)}</span></div>
+    <div class="zWhy">${why}</div></div>`;
+  /* W.m là tiền TRÊN OKX; W.ex là bitmask gộp 4 sàn nên bitCount==1 nghĩa là
+     chỉ mình OKX có tiền ở mốc này — không sai, nhưng kém được xác nhận hơn */
+  const moTa = (W, ab, loai) => `tường ${loai} <b>${fmtMoney(W.m)}</b> trên OKX · tin ${W.trust}/100`
+    + (wallInfo(E, ab, W.p) ? ' · ' + wallInfo(E, ab, W.p) : '')
+    + (bitCount(W.ex || 0) <= 1 ? ' · <span class="w1">⚠ chỉ OKX có</span>'
+       : ` · ${bitCount(W.ex)} sàn cùng có`);
+  h += zRow('VÀO', isLong ? 'cUp' : 'cDn', vao, moTa(vao, isLong ? 'b' : 'a', isLong ? 'mua' : 'bán'));
+  h += zRow('CHỐT', '', chot, moTa(chot, isLong ? 'a' : 'b', isLong ? 'bán' : 'mua'));
+  h += `<div class="zRow"><div class="zTop"><span class="zTag w1">CẮT</span>
+      <span class="zP">${fmtPrice(K.cat, step)}</span>
+      <span class="zPct">${fmtPct((K.cat / mid - 1) * 100)}</span></div>
+    <div class="zWhy">vượt qua tường vào ${(HE_SO_CAT * 100).toFixed(0)}% biên khung — tường vào thủng là giả định gốc sai</div></div>`;
+
+  /* RR và mốc so sánh: tỷ lệ thắng không kèm hai số này là con số vô nghĩa.
+     baseline = xác suất chạm chốt trước nếu giá đi hoàn toàn ngẫu nhiên. */
+  const mini = [];
+  if (K.rr !== null) mini.push(`R:R <b>${K.rr.toFixed(2)}</b>`);
+  if (K.baseline !== null) mini.push(`cần thắng &gt; <b>${(K.baseline * 100).toFixed(0)}%</b> mới hơn ngẫu nhiên`);
+  mini.push(`trần ${P.frameH}h <b>${fmtPrice(mid * (1 + P.cap), step)}</b>`,
+            `sàn ${P.frameH}h <b>${fmtPrice(mid * (1 - P.cap), step)}</b>`);
+  if (P.eta !== null && P.eta >= 0 && P.eta < 600) mini.push(`⏱ ETA <b>${P.eta}'</b>`);
+  if (P.far) mini.push(`tầm xa <b>${fmtPrice(P.far.p, step)}</b> (${fmtPct((P.far.p / mid - 1) * 100)} · tin ${P.far.trust})`);
+  h += `<div class="zMini">${mini.join(' &nbsp;·&nbsp; ')}</div>`;
+
+  /* ---- dòng căn cứ (số liệu thật đang đo) ---- */
+  h += `<div class="ccBasis">khung <b>${P.frameH}h</b>`
+    + ` · dòng 30' <b class="${P.f30 >= 0 ? 'up' : 'dn'}">${fmtSigned(P.f30)}</b>`
+    + ` · 5' <b class="${P.f5 >= 0 ? 'up' : 'dn'}">${fmtSigned(P.f5)}</b>`
+    + (market.funding !== null ? ` · funding <b>${(market.funding * 100).toFixed(3)}%/${fH}h</b>` : '')
+    + ((P.L || P.SL) ? ` · thanh lý 5' long <b>${fmtMoney(P.L)}</b> / short <b>${fmtMoney(P.SL)}</b>` : '')
+    + ` · biên <b>±${(P.cap * 100).toFixed(1)}%</b></div>`;
+
+  /* ---- bản đồ mốc ---- */
+  if (P.levels){
+    const maxM = Math.max(1, ...P.levels.res.map(L => L.m), ...P.levels.sup.map(L => L.m));
+    const lvlRow = (L, i, isRes) => {
+      const w = Math.max(5, Math.round(L.m / maxM * 100));
+      const note = L.thin
+        ? `${isRes ? 'vượt' : 'thủng'} → <b class="w1">TRỐNG</b> tới ${fmtPrice(L.tgtP, step)} (${fmtPct((L.tgtP / mid - 1) * 100)})`
+        : `sau lưng còn ${fmtMoney(L.gap)} chắn`;
+      return `<div class="lvl">
+        <div class="lvlTag ${isRes ? 'cDn' : 'cUp'}">${isRes ? 'KHÁNG CỰ' : 'ĐỠ'} ${i + 1}</div>
+        <div class="lvlMain">
+          <span class="lvlP">${fmtPrice(L.p, step)}</span>
+          <span class="lvlPct">${fmtPct((L.p / mid - 1) * 100)}</span>
+          <span class="lvlBar"><i style="width:${w}%;background:var(--${isRes ? 'red' : 'green'})"></i></span>
+          <span class="lvlM">${fmtMoney(L.m)}</span>
+          ${trustChip(L.trust)}
+          ${bitCount(L.ex || 0) <= 1 ? '<span class="trust w1">chỉ OKX</span>' : ''}
+        </div>
+        <div class="lvlNote">${note}</div>
+      </div>`;
+    };
+      h += '<div class="ccMap"><div class="ccMapTit">BẢN ĐỒ MỐC (sổ OKX) — vượt mốc TRỐNG là chạy nhanh</div>'
+      + P.levels.res.map((L, i) => ({L, i})).reverse().map(x => lvlRow(x.L, x.i, true)).join('')
+      + `<div class="nowLine">${fmtPrice(mid, step / 10)}</div>`
+      + P.levels.sup.map((L, i) => lvlRow(L, i, false)).join('')
+      + '</div>';
+  }
+  return `<div class="coinCard ${isLong ? 'long' : 'short'}">${h}</div>`;
+}
+
+function renderLists(){
+  const longs = [], shorts = [];
+  for (const sym of Object.keys(engines)){
+    const K = keoCua(engines[sym]);
+    if (K) (K.isLong ? longs : shorts).push(K);
+  }
+  longs.sort((a, b) => b.S - a.S);      /* điểm mạnh nhất lên đầu */
+  shorts.sort((a, b) => a.S - b.S);
+
+  $('listLong').innerHTML = longs.length
+    ? longs.map(K => theCoin(engines[K.sym], K)).join('')
+    : '<div class="emptyList">Chưa coin nào đủ điều kiện long</div>';
+  $('listShort').innerHTML = shorts.length
+    ? shorts.map(K => theCoin(engines[K.sym], K)).join('')
+    : '<div class="emptyList">Chưa coin nào đủ điều kiện short</div>';
+  $('cntLong').textContent = longs.length;
+  $('cntShort').textContent = shorts.length;
+
+  /* dòng chú thích của khối QUÉT OKX gánh luôn phần chẩn đoán: bao nhiêu coin đang
+     theo dõi, bao nhiêu kết nối sàn còn sống, bao nhiêu coin chưa ấm máy — vì coin
+     không có tín hiệu nay hoàn toàn không hiện ở đâu, hai bảng trống trơn trong 90
+     giây đầu và không có dòng này thì không phân biệt được với app hỏng */
+  const syms = Object.keys(engines);
+  let live = 0, am = 0;
+  for (const s of syms){
+    live += Object.values(engines[s].conns).filter(c => c.state === 'live').length;
+    const P = engines[s].pred;
+    if (!P.ready || P.warmLeft > 0) am++;
+  }
+  $('scanNote').textContent = `${syms.length} coin đang theo dõi · ${live}/${syms.length * 4} sàn live`
+    + (am ? ` · ${am} chưa ấm máy` : '')
+    + ' · bấm một dòng để ghim / bỏ ghim';
+  document.title = `${longs.length}L/${shorts.length}S — Sổ Lệnh Gộp`;
+}
+
+/* 1 giây/lần là đủ: dữ liệu chỉ đổi mỗi 2 giây theo nhịp phân tích, mà mỗi lần vẽ
+   là dựng lại toàn bộ thẻ (kèm bản đồ mốc) nên không nên chạy dày hơn */
+/* ==================================================================
+   LUẬT SINH KÈO + GỬI LOG
+   Mỗi nhịp 2 giây, mỗi coin: nếu chưa có kèo đang mở và hội đủ điều kiện tối
+   thiểu thì phát MỘT kèo. Ra khoảng 20-40 kèo/ngày trên 8 coin, và quan trọng
+   là chúng ĐỘC LẬP với nhau — không phải 10 quan sát của cùng một cấu trúc sổ.
+   ================================================================== */
+function ulid(){
+  const C = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   /* Crockford base32 */
+  let t = Date.now(), a = '';
+  for (let i = 9; i >= 0; i--){ a = C[t % 32] + a; t = Math.floor(t / 32); }
+  for (let i = 0; i < 16; i++) a += C[(Math.random() * 32) | 0];
+  return a;
+}
+/* Giá gửi dạng CHUỖI với đúng 15 số lẻ: khớp DECIMAL(30,15) và tránh ký hiệu
+   mũ (1.23e-8) mà MySQL không nhận. Coin có giá từ 0.0000000123 tới 90000. */
+const sp = x => (x === null || x === undefined || !isFinite(x)) ? null : Number(x).toFixed(15);
+
+const hangDoi = [];        /* outbox trong RAM, mất khi F5 — chấp nhận ở bản đầu */
+let dangGui = false;
+
+function tinhChan(P){
+  /* bitmask 4 chốt chặn. 0 = kèo THẬT (qua hết), >0 = kèo bị chặn */
+  return (Math.abs(P.S) < 25 ? 1 : 0)
+       | (P.active < 2      ? 2 : 0)
+       | (P.flowConflict    ? 4 : 0)
+       | (P.satNoConfirm    ? 8 : 0);
+}
+
+function sinhKeo(E){
+  const P = E.pred;
+  if (!P.ready || P.warmLeft > 0) return;
+  if (!P.sup || !P.res) return;                       /* không có tường thì không có kèo */
+  if (Math.abs(P.S) < NGUONG_GHI) return;
+  const now = Date.now();
+  if (E.keoMo && now < E.keoMo.han) return;           /* mỗi coin một kèo mở tại một thời điểm */
+
+  const isLong = P.S > 0;
+  const vao = isLong ? P.sup : P.res, chot = isLong ? P.res : P.sup;
+  const cat = vao.p + (isLong ? -1 : 1) * HE_SO_CAT * P.cap * P.mid;
+  const han = now + P.frameH * 3600e3;
+  const tyLe = w => (w.mGop > 0 ? +(w.m / w.mGop).toFixed(4) : null);
+
+  const k = {
+    uid: ulid(), ts: now, coin: E.sym, inst_id: E.sym + '-USDT-SWAP',
+    ver: VER_TRONG_SO, loai: 'dir',
+    dir: isLong ? 1 : -1,
+    mid: sp(P.mid), bid: sp(P.bbOkx), ask: sp(P.baOkx),
+    vao: sp(vao.p), chot: sp(chot.p), cat: sp(cat), han_ms: han,
+    s: +P.S.toFixed(2),
+    sig_f30: +P.sig.f30.toFixed(4), sig_f5: +P.sig.f5.toFixed(4),
+    sig_bk:  +P.sig.bk.toFixed(4),  sig_oi: +P.sig.oi.toFixed(4),
+    sig_fu:  +P.sig.fu.toFixed(4),  sig_lq: +P.sig.lq.toFixed(4),
+    book_usd: Math.round(P.bookM), mua30_usd: Math.round(P.mua30), ban30_usd: Math.round(P.ban30),
+    cap: +P.cap.toFixed(6), frame_h: P.frameH, ex_mask: P.exMask,
+    vao_trust: vao.trust, vao_sv: 0, vao_pl: 0,
+    vao_usd: Math.round(vao.m), vao_ty_le_okx: tyLe(vao),
+    chot_trust: chot.trust, chot_usd: Math.round(chot.m), chot_ty_le_okx: tyLe(chot),
+    tuoi_may: Math.round((now - E.engineStart) / 1000),
+    tuoi_coin: P.tuoiCoin === null ? null : +P.tuoiCoin.toFixed(2),
+    chan: tinhChan(P),
+    ghim: scan.ghim.has(E.sym) ? 1 : 0
+  };
+  const w = E.wallBook[wallKey(isLong ? 'b' : 'a', vao.p)];
+  if (w){ k.vao_sv = w.sv || 0; k.vao_pl = w.pl || 0; }
+
+  E.keoMo = {uid: k.uid, han};
+  hangDoi.push(k);
+  if (hangDoi.length > 40) hangDoi.splice(0, hangDoi.length - 40);
+}
+
+/* Gửi theo LÔ mỗi 10 giây. Fire-and-forget, timeout 5 giây — vòng phân tích
+   tuyệt đối không được chờ mạng, một endpoint treo là app đứng hình. */
+async function guiLog(){
+  if (!API_LOG || dangGui || !hangDoi.length) return;
+  dangGui = true;
+  const lo = hangDoi.slice(0, 50);
+  const huy = new AbortController();
+  const hetGio = setTimeout(() => huy.abort(), 5000);
+  try{
+    const r = await fetch(API_LOG, {method: 'POST', signal: huy.signal,
+      headers: {'Content-Type': 'application/json', 'X-Token': API_TOKEN},
+      body: JSON.stringify(lo)});
+    if (r.ok) hangDoi.splice(0, lo.length);          /* gửi hỏng thì GIỮ LẠI, thử lại sau */
+  }catch(e){}
+  finally{ clearTimeout(hetGio); dangGui = false; }
+}
+setInterval(guiLog, 10000);
+
+function render(){ renderLists(); }
+setInterval(render, 1000);
 
 /* ==================================================================
-   MÁY QUÉT OKX — tự tìm coin tăng/giảm mạnh, tự nạp coin nóng nhất
-   vào phân tích (chế độ TỰ ĐỘNG), log tích lũy liên tục theo từng coin
+   MÁY QUÉT OKX — chọn ra SO_COIN coin nóng nhất rồi bật/tắt engine
    ================================================================== */
-const scan = {rows: [], hist: {}, auto: true, lastSwitch: 0};
-
-function scanAutoOff(){
-  if (!scan.auto) return;
-  scan.auto = false;
-  updateAutoBtn();
-}
-function updateAutoBtn(){
-  const b = $('autoBtn');
-  b.textContent = scan.auto ? 'TỰ ĐỘNG: BẬT' : 'TỰ ĐỘNG: TẮT';
-  b.className = scan.auto ? '' : 'off';
-}
-$('autoBtn').onclick = () => { scan.auto = !scan.auto; scan.lastSwitch = 0; updateAutoBtn(); autoPick(); };
+/* ghim = tập coin người dùng tự chọn, máy quét KHÔNG được phép gỡ.
+   Thay cho nút TỰ ĐỘNG cũ: không còn trạng thái bật/tắt toàn cục nào có thể mắc kẹt,
+   coin nào không ghim thì vẫn xoay vòng tự động như thường. */
+const scan = {rows: [], hist: {}, ghim: new Set()};
 
 async function pollScan(){
   try{
@@ -1300,61 +1394,77 @@ async function pollScan(){
         heat: Math.abs(chg15 !== null ? chg15 : 0) * 6 + Math.abs(last / open - 1)});
     }
     scan.rows = rows;
+    dongBoEngine();
     renderScan();
-    autoPick();
   }catch(e){}
 }
 
-/* tự nạp coin nóng nhất; chỉ đổi coin tối đa 15 phút/lần và khi con mới nóng hơn hẳn */
-function autoPick(){
-  if (!scan.auto || !scan.rows.length) return;
-  const now = Date.now();
-  if (now - scan.lastSwitch < 15 * 60e3) return;
-  const best = [...scan.rows].sort((a, b) => b.heat - a.heat)[0];
-  if (!best) return;
-  if (best.sym === curSym){ scan.lastSwitch = now; return; }
-  const cur = scan.rows.find(r => r.sym === curSym);
-  if (cur && best.heat < cur.heat * 1.5) return;
-  scan.lastSwitch = now;
-  $('sym').value = best.sym;
-  start(true);
+/* Đồng bộ tập engine với top coin nóng nhất.
+   CÓ ĐỘ TRỄ (hysteresis): coin đang theo dõi chỉ bị gỡ khi rớt khỏi top SO_COIN+4,
+   và mỗi vòng quét chỉ thay tối đa 2 coin. Không có hai chốt này thì tập coin
+   nhảy loạn mỗi phút, và mỗi lần gỡ là mất sạch wallBook đã tích được. */
+function dongBoEngine(){
+  if (!scan.rows.length) return;
+  const xepHang = [...scan.rows].sort((a, b) => b.heat - a.heat);
+  const giuLai = new Set(xepHang.slice(0, SO_COIN + 4).map(r => r.sym));
+
+  /* 1. gỡ coin đã rớt hẳn khỏi vùng đệm — TỐI ĐA 2 con mỗi vòng, vì mỗi lần gỡ
+     là mất sạch wallBook đã tích được của coin đó. Coin GHIM miễn nhiễm. */
+  let daGo = 0;
+  for (const sym of Object.keys(engines)){
+    if (daGo >= 2) break;
+    if (scan.ghim.has(sym)) continue;
+    if (!giuLai.has(sym)){ dungEngine(sym); daGo++; }
+  }
+  /* 2. lấp đầy tới SO_COIN bằng coin nóng nhất chưa được theo dõi (không giới hạn
+     số lần thêm — lúc mới mở trang phải bật đủ ngay). Duyệt cả bảng xếp hạng chứ
+     không chỉ top SO_COIN, vì các coin ghim đã chiếm sẵn một phần chỗ. */
+  for (const r of xepHang){
+    if (Object.keys(engines).length >= SO_COIN) break;
+    if (!engines[r.sym]) batDauEngine(r.sym, Object.keys(engines).length);
+  }
 }
 
 function renderScan(){
   const pct = x => (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
   const volTxt = v => v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.round(v / 1e3) + 'K';
-  const row = r => `<div class="scanRow${r.sym === curSym ? ' cur' : ''}" data-s="${r.sym}">
-    <span class="s">${r.sym === curSym ? '▶ ' : ''}${r.sym}</span>
+  const row = r => `<div class="scanRow${scan.ghim.has(r.sym) ? ' ghim' : engines[r.sym] ? ' theodoi' : ''}" data-s="${r.sym}">
+    <span class="s">${scan.ghim.has(r.sym) ? '📌' : engines[r.sym] ? '▶ ' : ''}${r.sym}</span>
     <span class="${r.chg24 >= 0 ? 'up' : 'dn'}">${pct(r.chg24)}</span>
     <span class="${(r.chg15 || 0) >= 0 ? 'up' : 'dn'}">${r.chg15 !== null ? "15': " + pct(r.chg15) : ''}</span>
     <span class="v">$${volTxt(r.volUsd)}</span></div>`;
-  const ups = [...scan.rows].filter(r => r.chg24 > 0).sort((a, b) => b.chg24 - a.chg24).slice(0, 5);
-  const dns = [...scan.rows].filter(r => r.chg24 < 0).sort((a, b) => a.chg24 - b.chg24).slice(0, 5);
-  $('scanUp').innerHTML = '<div style="color:var(--dim);font-size:11px">TOP TĂNG 24h</div>' + ups.map(row).join('');
-  $('scanDn').innerHTML = '<div style="color:var(--dim);font-size:11px">TOP GIẢM 24h</div>' + dns.map(row).join('');
+  const ups = [...scan.rows].filter(r => r.chg24 > 0).sort((a, b) => b.chg24 - a.chg24).slice(0, 6);
+  const dns = [...scan.rows].filter(r => r.chg24 < 0).sort((a, b) => a.chg24 - b.chg24).slice(0, 6);
+  $('scanUp').innerHTML = '<h3>TOP TĂNG 24h</h3>' + ups.map(row).join('');
+  $('scanDn').innerHTML = '<h3>TOP GIẢM 24h</h3>' + dns.map(row).join('');
   document.querySelectorAll('.scanRow').forEach(el => {
     el.onclick = () => {
-      scanAutoOff();                       /* bấm tay = tạm tắt tự động để không bị giật coin */
-      $('sym').value = el.dataset.s;
-      start(true);
-      renderScan();
+      const s = el.dataset.s;
+      if (scan.ghim.has(s)){
+        /* bỏ ghim: trả coin về cho máy quét tự xoay vòng, KHÔNG gỡ engine ngay
+           (nó vẫn chạy tới khi rớt khỏi vùng đệm, khỏi phí wallBook đã tích) */
+        scan.ghim.delete(s);
+      } else if (!engines[s] && Object.keys(engines).length >= SO_COIN){
+        /* chưa theo dõi mà đã đủ chỗ: nhường chỗ bằng coin KHÔNG ghim yếu nhất */
+        let yeu = '', bs = Infinity;
+        for (const k in engines){
+          if (scan.ghim.has(k)) continue;
+          const P = engines[k].pred;
+          const v = P.ready ? Math.abs(P.S) : 0;
+          if (v < bs){ bs = v; yeu = k; }
+        }
+        if (yeu){ dungEngine(yeu); scan.ghim.add(s); batDauEngine(s, 0); }
+        /* ghim kín SO_COIN chỗ rồi thì không nhận thêm — bỏ ghim bớt một con trước */
+      } else {
+        scan.ghim.add(s);
+        if (!engines[s]) batDauEngine(s, 0);
+      }
+      render(); renderScan();
     };
   });
 }
 setInterval(pollScan, 60000);
 pollScan();
-
-/* gõ mã coin xong ngừng 0.6s là tự tìm; Enter tìm ngay — gõ tay cũng tạm tắt tự động */
-let typeTimer = null;
-$('sym').addEventListener('input', () => {
-  scanAutoOff();
-  clearTimeout(typeTimer);
-  typeTimer = setTimeout(() => start(false), 600);
-});
-$('sym').addEventListener('keydown', e => {
-  if (e.key === 'Enter'){ clearTimeout(typeTimer); start(true); }
-});
-start(true);
 </script>
 </body>
 </html>
