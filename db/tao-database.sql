@@ -78,9 +78,9 @@ CREATE TABLE IF NOT EXISTS keo (
   ghim            TINYINT(1)       NOT NULL DEFAULT 0      COMMENT '1 = coin do người dùng ghim tay (dấu thiên lệch lựa chọn)',
 
   -- === kết quả — CHỈ cron được ghi, client không bao giờ ===
-  kq              ENUM('mo','thang','thua','het_han','nhap_nhang','bo_qua') NOT NULL DEFAULT 'mo'
-                                                           COMMENT 'quy ước CHẠM: bóng nến chạm tới giá',
-  kq_dong         ENUM('mo','thang','thua','het_han','nhap_nhang','bo_qua') NULL DEFAULT NULL
+  kq              ENUM('mo','thang','thua','het_han','nhap_nhang','khong_khop','bo_qua') NOT NULL DEFAULT 'mo'
+                                                           COMMENT 'quy ước CHẠM (bóng nến). khong_khop = lệnh chờ tại `vao` không bao giờ khớp -> KHÔNG tính vào tỷ lệ thắng',
+  kq_dong         ENUM('mo','thang','thua','het_han','nhap_nhang','khong_khop','bo_qua') NULL DEFAULT NULL
                                                            COMMENT 'quy ước ĐÓNG NẾN vượt hẳn — so với kq để đo độ nhạy của kết luận',
   gia_ra          DECIMAL(30,15)   NULL,
   ts_ra           BIGINT UNSIGNED  NULL,
@@ -145,6 +145,8 @@ FROM (
     (k.ask - k.bid)     / NULLIF(k.mid, 0) * 10000                        AS spread_bp,
     (k.ts_ra - k.ts) / 60000                                              AS giu_phut,
     CASE WHEN k.chan = 0 THEN 'that' ELSE 'bong' END                      AS nhom,
+    -- lệnh chờ không khớp: kèo chưa từng tồn tại, phải đếm riêng
+    CASE WHEN k.kq = 'khong_khop' THEN 1 ELSE 0 END                       AS khong_khop,
     CASE k.kq      WHEN 'thang' THEN 1 WHEN 'thua' THEN 0 ELSE NULL END   AS thang01,
     CASE k.kq_dong WHEN 'thang' THEN 1 WHEN 'thua' THEN 0 ELSE NULL END   AS thang01_dong,
     -- HẾT HẠN KHÔNG PHẢI THUA: kèo đứng yên rồi hết giờ có R gần 0, khác hẳn
@@ -162,6 +164,21 @@ FROM (
   LEFT JOIN phi p
     ON p.tu_ngay = (SELECT MAX(tu_ngay) FROM phi WHERE tu_ngay <= DATE(k.ts_srv))
 ) t;
+
+
+-- ---------------------------------------------------------------------
+--  4. NÂNG CẤP CHO DATABASE ĐÃ TẠO TRƯỚC ĐÓ
+--  Bổ sung giá trị 'khong_khop' vào hai cột ENUM. Với database mới tạo ở
+--  bước 1 thì hai câu này là no-op. MODIFY COLUMN chạy lại bao nhiêu lần
+--  cũng an toàn và không đụng tới dữ liệu sẵn có.
+-- ---------------------------------------------------------------------
+ALTER TABLE keo
+  MODIFY COLUMN kq ENUM('mo','thang','thua','het_han','nhap_nhang','khong_khop','bo_qua')
+    NOT NULL DEFAULT 'mo'
+    COMMENT 'quy ước CHẠM (bóng nến). khong_khop = lệnh chờ không bao giờ khớp',
+  MODIFY COLUMN kq_dong ENUM('mo','thang','thua','het_han','nhap_nhang','khong_khop','bo_qua')
+    NULL DEFAULT NULL
+    COMMENT 'quy ước ĐÓNG NẾN vượt hẳn — so với kq để đo độ nhạy của kết luận';
 
 
 -- =====================================================================

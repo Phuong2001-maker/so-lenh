@@ -26,50 +26,67 @@ Mục đích: mở chat mới, AI đọc đúng file này là hiểu ngay dự �
 
 ---
 
-## 📍 ĐANG LÀM DỞ ĐẾN ĐÂU (cập nhật 2026-08-09)
+## 📍 ĐANG LÀM DỞ ĐẾN ĐÂU (cập nhật 2026-08-09, cuối phiên)
 
-Đọc mục này trước, rồi mới đọc phần còn lại.
-
-**Giai đoạn 2 (database) đã viết xong code, đang ở khâu triển khai.**
+**Giai đoạn 2 (database) đã xong code và đã qua một đợt rà soát 25 agent. Đang kẹt ở khâu hạ tầng.**
 
 | Việc | Trạng thái |
 |---|---|
-| `php/config.php` | ✅ đã điền đủ 4 giá trị (DB `buwsofujhosting_coin_db`, user `buwsofujhosting_coin_user`, token 32 ký tự) |
-| Chống lộ bí mật lên GitHub | ✅ `config.php` đã untrack + vào `.gitignore`, thêm `php/config.mau.php` và `php/.htaccess` |
-| `API_TOKEN` trong index.html | ✅ đã điền, khớp `config.php` |
-| Lược đồ MySQL trên **database MỚI** | ⚠ **phải xác nhận lại** — xem dưới |
-| Tải thư mục `php/` lên hosting | ⏳ chưa |
-| **`API_LOG` trong index.html** | ⛔ **CÒN TRỐNG — thứ duy nhất chặn việc lưu dữ liệu**, chờ tên miền hosting |
-| Cron chạy `cham.php` | ⏳ chưa |
+| Lược đồ MySQL (`db/tao-database.sql`) | ✅ đã chạy trên hosting |
+| `php/config.php` | ✅ đã điền (có `.gitignore` che, bản mẫu là `config.mau.php`) |
+| `API_LOG` / `API_TOKEN` trong index.html | ✅ đã điền |
+| Tải `php/` lên hosting | ✅ **xong, đã kiểm bằng curl thật** — xem bảng dưới |
+| Tên miền + bản ghi DNS | ✅ xong — `zewvir85` A → `103.75.186.15`, site addon PHP 8.1 đã tạo |
+| VIEW `v_keo` + ENUM `khong_khop` | ✅ đã Import lại SQL, `bao-cao.php` từ 500 → **200** |
+| **Cấp SSL Let's Encrypt** | ⛔ **CHƯA — đây là thứ duy nhất còn chặn**, vì `API_LOG` dùng `https://` |
+| Cron `cham.php` | ⏳ chưa |
 
-### ⛔ Việc tiếp theo phải làm
+**Đã kiểm bằng `curl` thật qua HTTP (không suy đoán), chỉ có 4 file PHP + `.htaccess` trong `/domains/zewvir85.hiteckqualityconstruction.com.au/php/`:**
 
-**1. `API_LOG` ở [index.html:149](index.html:149) vẫn là chuỗi rỗng.** `guiLog()` mở đầu bằng `if (!API_LOG ...) return;` nên app **không gửi một byte nào**. Chủ dự án đã chọn chạy app bằng `file://` từ máy tính (chỉ tải `php/` lên hosting), nên `API_LOG` phải là **URL tuyệt đối** dạng `https://<tên-miền>/php/ghi.php` — đường dẫn tương đối không dùng được với `file://`. `ORIGIN_CHO_PHEP` đã có sẵn `'null'` nên CORS thông.
+| Đường dẫn | Mã | Nghĩa |
+|---|---|---|
+| `/php/ghi.php` | **405** | ✅ sống. 405 là ĐÚNG — chỉ nhận POST. Trả được 405 nghĩa là `require config.php` thành công |
+| `/php/cham.php` | **401** | ✅ sống, đòi token khi gọi qua HTTP |
+| `/php/config.php` | **403** | ✅ `.htaccess` đang hoạt động. Trước khi có nó là **200 với thân rỗng** — PHP thực thi nên không lộ mã, nhưng 403 mới là đúng |
+| `/php/bao-cao.php` | **200** | ✅ HTML đúng. Trước đó **500** vì VIEW `v_keo` là bản cũ, thiếu `khong_khop` / `thang01_dong` / `chot_bp` / `spread_bp` — Import lại `db/tao-database.sql` là hết |
 
-Hệ quả của lựa chọn `file://`: app **không** chạy 24/7 — nó chỉ ghi khi có tab trình duyệt đang mở. Đổi lại `API_TOKEN` không bị phơi công khai. Muốn ghi liên tục thì phải có một máy để tab mở suốt.
+⚠ **Bẫy đã dính: import DDL rồi cập nhật DDL sau thì database bị tụt lại.** Chủ dự án import `tao-database.sql` TRƯỚC khi đợt rà soát 25 agent thêm `khong_khop` vào VIEW và 2 ENUM, nên DB có VIEW cũ trong khi `bao-cao.php` là bản mới → 500 với thân trang RỖNG (hosting tắt `display_errors`, không có thông tin gì để lần). **Mỗi lần sửa `db/tao-database.sql` là phải Import lại**, file idempotent nên chạy lại vô hại.
 
-**2. Xác nhận lược đồ đã dựng trên ĐÚNG database mới.** Ảnh chụp panel hosting cho thấy database `buwsofujhosting_coin_db` vừa được tạo, nên rất có thể `db/tao-database.sql` **chưa** chạy trên nó. Kiểm trước khi làm gì tiếp:
+⚠ **Hosting CHÈN script vào mọi trang HTML:** `<script src="/_osh/collect.js" async>`. Đã kiểm: nó **không** chèn vào phản hồi `application/json`, `ghi.php` trả đúng `{"ok":false,"loi":"chi nhan POST"}` nên đường ống JSON không bị bẩn. Nhưng đừng bao giờ giả định — thêm endpoint JSON mới thì kiểm lại bằng `curl` chứ đừng tin.
 
-```sql
-SHOW TABLES;                              -- phải thấy keo, phi, v_keo
-SHOW COLUMNS FROM keo LIKE 'cham_luc';    -- phải có 1 dòng
+⚠ **Cách kiểm mà không cần chờ DNS lan:** `curl --resolve <domain>:80:103.75.186.15 http://<domain>/...` — buộc curl đi thẳng IP, bỏ qua mọi cache DNS. Và `nslookup <domain> ns1.inet.vn` hỏi thẳng nameserver gốc để biết bản ghi đã lưu đúng chưa, khỏi chờ `8.8.8.8` cập nhật.
+
+⚠ **Hai bẫy vận hành của File Manager 1Panel:** (a) mặc định **ẩn** file bắt đầu bằng dấu chấm — phải bấm **Hidden files** mới thấy `.htaccess`, đừng kết luận là chưa tải lên; (b) ô *If file exist* để **Skip** thì gặp file đã tồn tại nó **báo đỏ và DỪNG cả lô** — lần đầu chỉ 2/5 file lên được. Chọn **Overwrite!** để tải lô.
+
+### ⛔ Việc tiếp theo
+
+**Đã ĐỔI đích khỏi `worldcup2026.click`.** Domain đó dùng nameserver **Cloudflare**, nên phải sửa DNS ở Cloudflare (không phải iNET) và phải tắt Proxy về xám mới cấp được SSL — hai chỗ dễ sai. `hiteckqualityconstruction.com.au` quản DNS ngay tại iNET, đơn giản hơn hẳn. Đánh đổi đã biết và đã chấp nhận: endpoint log crypto nằm chung tên miền với một công ty xây dựng đang hoạt động.
+
+`index.html` dòng 149 đã trỏ sẵn vào `https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php`.
+
+**Bốn bước còn lại, theo đúng thứ tự:**
+
+1. **iNET OnePortal → domain `hiteckqualityconstruction.com.au` → Bản ghi → Thêm bản ghi:** loại `A`, tên `zewvir85`, nội dung `103.75.186.15`, TTL 5 phút. Chỉ **thêm mới**, đừng sửa 4 bản ghi sẵn có (`@ A 103.75.186.15`, `www CNAME`, 2 × `TXT` trong đó có `google-site-verification`).
+2. **1Panel → Thêm tên miền** `zewvir85.hiteckqualityconstruction.com.au`, kiểu `addon`, PHP `8.1`.
+3. **SSL Certificates → cấp Let's Encrypt.** Chỉ làm được sau khi bước 1 đã phân giải.
+4. **Tải nguyên thư mục `php/` vào docroot**, bật hiện file ẩn để `.htaccess` cũng lên.
+
+Kiểm từng bước, đừng làm dồn:
+
+```bash
+nslookup zewvir85.hiteckqualityconstruction.com.au    # phải ra 103.75.186.15
+curl -i https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php
 ```
 
-Thiếu thì Import lại `db/tao-database.sql` qua tab **Import** (đừng dán vào tab SQL — xem bẫy CodeMirror ở nhật ký).
+`curl` trả **401** là ĐÚNG — nghĩa là PHP chạy được, chỉ thiếu header token. Trả `Could not resolve host` là DNS chưa xong; trả 403/404 là `php/` chưa đúng chỗ.
 
-### Hai rủi ro hạ tầng đã lường trước
+⚠ Bản ghi gốc `@ A` của domain này **vốn đã trỏ đúng `103.75.186.15`** — cùng server với hosting, nên không phải xin IP mới.
 
-**cURL đi ra ngoài có thể bị chặn.** Hosting miễn phí hay chặn PHP gọi ra internet, mà `cham.php` bắt buộc phải gọi `www.okx.com` để kéo nến. Bị chặn thì mọi kèo kẹt trạng thái `mo` vĩnh viễn. Phải chạy tay `php cham.php` một lần để thử trước khi cài cron — in ra `0 keo dang mo` là được.
+### ⚠ Rủi ro hạ tầng còn nguyên, chưa kiểm chứng được
 
-**Tần suất cron.** Gói miễn phí thường không cho chạy mỗi phút. 5–15 phút/lần vẫn dùng được, chỉ chậm hơn chứ không sai, vì `cham.php` chấm bằng nến lịch sử chứ không bằng giá tại thời điểm chạy.
+**cURL đi ra ngoài** — `cham.php` bắt buộc gọi được `www.okx.com`. Hosting miễn phí hay chặn. Bị chặn thì kèo kẹt `mo` rồi thành `bo_qua` hàng loạt mà trang báo cáo vẫn hiển thị bình thường. Phải chạy tay `php cham.php` một lần trước khi cài cron.
 
-### Đang chờ kết quả
-
-Một đợt rà soát trước deploy (5 chiều: đường ống ghi, lỗi PHP, độ chính xác máy phân tích, hiệu năng 24/7, bảo mật) đã chạy trong phiên 2026-08-09 nhưng **kết quả chưa được ghi lại vào đây**. Nếu phiên mới không có kết quả đó thì nên chạy lại rà soát trước khi deploy thật.
-
-**Đã tự kiểm chứng và OK:** ánh xạ 39 trường app gửi ↔ 39 trường `ghi.php` nhận ↔ cột trong bảng `keo` khớp hoàn toàn; các cột kết quả (`kq`, `gia_ra`, `mfe_bp`…) đúng là chỉ cron mới ghi được, client không chạm tới.
-
----
+**Cron chạy được không** — nếu host chỉ cho cron gọi URL chứ không có PHP CLI thì `cham.php` nay đã hỗ trợ token qua query string: `https://<tên-miền>/php/cham.php?token=<API_TOKEN>`. Đừng chia sẻ URL đó.
 
 ## Dự án là gì
 
@@ -111,7 +128,7 @@ Git: repo nằm ở thư mục `so-lenh/`. Thư mục cha `Coin/` **không** ph�
 
 ## Kiến trúc
 
-Một file, ~1470 dòng, cộng thư mục `db/` (SQL) và `php/` (tầng log). **Điểm mấu chốt phải hiểu trước tiên: app theo dõi NHIỀU COIN SONG SONG.**
+Một file, ~1490 dòng, cộng thư mục `db/` (SQL) và `php/` (tầng log). **Điểm mấu chốt phải hiểu trước tiên: app theo dõi NHIỀU COIN SONG SONG.**
 
 ### Khái niệm "engine"
 
@@ -145,17 +162,17 @@ Danh sách coin thì **vốn đã chỉ có OKX** — máy quét lấy từ `/ap
 
 ### Bốn tầng
 
-**1. Tầng kết nối (dòng 199–499)** — mỗi sàn một hàm `startXxx(E, g, ...)`, ghi vào `E.conns[key]` với `bids`/`asks` là `Map<priceStr, qty>` theo **đơn vị gốc của sàn**, kèm `pMul`/`qMul` để quy đổi. Cố ý KHÔNG ghép nhiều coin vào một socket dù cả 4 sàn đều hỗ trợ — làm vậy phải viết lại toàn bộ phần dò biến thể tên hợp đồng vốn rất dễ vỡ (xem Bẫy đã gặp), đổi lại chỉ tiết kiệm số socket vốn không phải nút thắt.
+**1. Tầng kết nối (dòng 199–512)** — mỗi sàn một hàm `startXxx(E, g, ...)`, ghi vào `E.conns[key]` với `bids`/`asks` là `Map<priceStr, qty>` theo **đơn vị gốc của sàn**, kèm `pMul`/`qMul` để quy đổi. Cố ý KHÔNG ghép nhiều coin vào một socket dù cả 4 sàn đều hỗ trợ — làm vậy phải viết lại toàn bộ phần dò biến thể tên hợp đồng vốn rất dễ vỡ (xem Bẫy đã gặp), đổi lại chỉ tiết kiệm số socket vốn không phải nút thắt.
 
-**2. Tầng gộp (`aggregate(E)`, dòng 969)** — trộn 4 sàn thành một sổ chung: loại sàn lệch giá >15% (sai hệ số hợp đồng), tự tính bước giá gom mốc, lọc lệnh bụi. Trả về `{bids, asks, mid, step}`, mỗi hàng có `ex` là **bitmask sàn nào đang có tiền ở mốc đó**.
+**2. Tầng gộp (`aggregate(E)`, dòng 975)** — trộn 4 sàn thành một sổ chung: loại sàn lệch giá >15% (sai hệ số hợp đồng), tự tính bước giá gom mốc, lọc lệnh bụi. Trả về `{bids, asks, mid, step}`, mỗi hàng có `ex` là **bitmask sàn nào đang có tiền ở mốc đó**.
 
-**3. Tầng phân tích (dòng 500–880)** — `updateWalls(E, A)` rồi `analyze(E, A)`, chạy cho **tất cả** engine mỗi 2 giây.
+**3. Tầng phân tích (dòng 513–886)** — `updateWalls(E, A)` rồi `analyze(E, A)`, chạy cho **tất cả** engine mỗi 2 giây.
 
-**4. Tầng hiển thị (dòng 1095–1364)** — `render()` → `renderLists()` → `theCoin(E, K)` dựng một thẻ đầy đủ cho mỗi coin có tín hiệu. **Không còn khối chi tiết riêng** — mọi thứ nằm trong thẻ.
+**4. Tầng hiển thị (dòng 1101–1387)** — `render()` → `renderLists()` → `theCoin(E, K)` dựng một thẻ đầy đủ cho mỗi coin có tín hiệu. **Không còn khối chi tiết riêng** — mọi thứ nằm trong thẻ.
 
-**Vòng đời engine (dòng 922–950):** `batDauEngine(sym, thuTu)` / `dungEngine(sym)`. Tham số `thuTu` chỉ để rải lệnh gọi REST 400ms một nhịp, tránh 8 engine bắn cùng lúc vào OKX.
+**Vòng đời engine (dòng 928–956):** `batDauEngine(sym, thuTu)` / `dungEngine(sym)`. Tham số `thuTu` chỉ để rải lệnh gọi REST 400ms một nhịp, tránh 8 engine bắn cùng lúc vào OKX.
 
-### Chọn tập coin — `dongBoEngine()` (dòng 1406)
+### Chọn tập coin — `dongBoEngine()` (dòng 1429)
 
 Mỗi 60 giây máy quét OKX xếp hạng toàn bộ ticker SWAP theo `heat`, rồi đồng bộ tập engine với top `SO_COIN`. **Có hai chốt chống nhảy loạn, đừng gỡ:**
 
@@ -164,7 +181,7 @@ Mỗi 60 giây máy quét OKX xếp hạng toàn bộ ticker SWAP theo `heat`, r
 
 Lý do: mỗi lần gỡ engine là mất sạch `wallBook` đã tích được của coin đó.
 
-**Không còn nút TỰ ĐỘNG** — thay bằng cơ chế **GHIM** (`scan.ghim`, dòng 1372). Bấm một dòng trong QUÉT OKX là ghim / bỏ ghim coin đó; máy quét **không bao giờ gỡ coin đã ghim**, coin không ghim vẫn xoay vòng tự động như thường. Ghim một coin chưa theo dõi mà tập đã đầy thì gỡ coin **không ghim** yếu nhất để nhường chỗ; nếu cả `SO_COIN` chỗ đều đã ghim thì không nhận thêm (phải bỏ ghim bớt). Bỏ ghim KHÔNG gỡ engine ngay — nó chạy tiếp tới khi rớt khỏi vùng đệm, để khỏi phí `wallBook` đã tích. Dấu 📌 = ghim, ▶ = đang theo dõi.
+**Không còn nút TỰ ĐỘNG** — thay bằng cơ chế **GHIM** (`scan.ghim`, dòng 1395). Bấm một dòng trong QUÉT OKX là ghim / bỏ ghim coin đó; máy quét **không bao giờ gỡ coin đã ghim**, coin không ghim vẫn xoay vòng tự động như thường. Ghim một coin chưa theo dõi mà tập đã đầy thì gỡ coin **không ghim** yếu nhất để nhường chỗ; nếu cả `SO_COIN` chỗ đều đã ghim thì không nhận thêm (phải bỏ ghim bớt). Bỏ ghim KHÔNG gỡ engine ngay — nó chạy tiếp tới khi rớt khỏi vùng đệm, để khỏi phí `wallBook` đã tích. Dấu 📌 = ghim, ▶ = đang theo dõi.
 
 Lý do bỏ nút: nút cũ là một trạng thái bật/tắt toàn cục **có thể mắc kẹt** — bấm tay một coin là tự động tắt vĩnh viễn, muốn bật lại phải có nút. Cơ chế ghim không có trạng thái toàn cục nào nên không kẹt được.
 
@@ -174,11 +191,11 @@ Bố cục **chỉ còn đúng 2 khối**: **QUÉT OKX** → **lưới 2 cột L
 
 ⚠ App **không còn dòng miễn trừ trách nhiệm nào** ("nhận định từ dữ liệu, không phải lời khuyên") sau khi footer bị bỏ theo yêu cầu. Nếu sau này chia sẻ cho người khác dùng thì cân nhắc thêm lại.
 
-**Mỗi coin có tín hiệu là MỘT THẺ tự chứa** (`theCoin(E, K)`, dòng 1137), gồm theo thứ tự: đầu thẻ (mã coin · giá · %24h · điểm S · thanh tin cậy) → cảnh báo funding/sổ mỏng nếu có → cảnh báo vượt mốc ⚡ nếu có → **VÀO / CHỐT** kèm mô tả tường → dòng phụ (trần · sàn · ETA · tầm xa) → dòng căn cứ (khung · dòng tiền · funding · thanh lý · biên) → **BẢN ĐỒ MỐC** 3 kháng cự + 3 đỡ. Viền trái xanh/đỏ theo hướng kèo.
+**Mỗi coin có tín hiệu là MỘT THẺ tự chứa** (`theCoin(E, K)`, dòng 1143), gồm theo thứ tự: đầu thẻ (mã coin · giá · %24h · điểm S · thanh tin cậy) → cảnh báo funding/sổ mỏng nếu có → cảnh báo vượt mốc ⚡ nếu có → **VÀO / CHỐT** kèm mô tả tường → dòng phụ (trần · sàn · ETA · tầm xa) → dòng căn cứ (khung · dòng tiền · funding · thanh lý · biên) → **BẢN ĐỒ MỐC** 3 kháng cự + 3 đỡ. Viền trái xanh/đỏ theo hướng kèo.
 
 **Coin KHÔNG có tín hiệu thì không hiện ở đâu cả.** Dải "đứng ngoài / đang khởi động" đã bị bỏ theo yêu cầu, nên phần chẩn đoán dồn hết vào dòng chú thích `#scanNote` ngay cạnh tiêu đề QUÉT OKX: số coin đang theo dõi, số kết nối sàn còn sống (vd `27/32 sàn live`), số coin chưa ấm máy. **Nếu thấy hai bảng trống hoàn toàn thì đọc dòng đó trước khi nghĩ là app hỏng** — 90 giây đầu sau khi mở trang chắc chắn trống.
 
-`keoCua(E)` (dòng 1110) là chỗ **định nghĩa giá vào / giá chốt** — không phát minh logic mới, chỉ đọc lại hai tường mà `analyze()` đã chọn: kèo LONG vào tại tường **đỡ** dưới (`pred.sup`) và chốt tại tường **kháng** trên (`pred.res`); kèo SHORT ngược lại. Trả `null` nếu coin không đủ điều kiện phát tín hiệu — đây cũng chính là bộ lọc quyết định coin nào được hiện.
+`keoCua(E)` (dòng 1116) là chỗ **định nghĩa giá vào / giá chốt** — không phát minh logic mới, chỉ đọc lại hai tường mà `analyze()` đã chọn: kèo LONG vào tại tường **đỡ** dưới (`pred.sup`) và chốt tại tường **kháng** trên (`pred.res`); kèo SHORT ngược lại. Trả `null` nếu coin không đủ điều kiện phát tín hiệu — đây cũng chính là bộ lọc quyết định coin nào được hiện.
 
 `pred.phat` (đặt trong `analyze`) gom toàn bộ điều kiện phát tín hiệu về **một chỗ duy nhất**: hết warmup 90s, `|S| ≥ 25`, ≥2 tín hiệu hoạt động, không `flowConflict`, không `satNoConfirm`, và có đủ cả `sup` lẫn `res`. Quan sát thực tế: điều kiện hay chặn nhất là `satNoConfirm` và **thiếu tường trong tầm `cap`** — nhiều coin có `|S|` khá cao vẫn không ra thẻ vì không tìm được tường đủ tin cậy.
 
@@ -188,7 +205,7 @@ Bố cục **chỉ còn đúng 2 khối**: **QUÉT OKX** → **lưới 2 cột L
 
 - `vao` = tường cùng phía (đỡ nếu long, kháng nếu short)
 - `chot` = tường đối diện
-- `cat` = **vượt qua tường vào** một khoảng `HE_SO_CAT × cap × mid`, mặc định `HE_SO_CAT = 0.30` (dòng 1096)
+- `cat` = **vượt qua tường vào** một khoảng `HE_SO_CAT × cap × mid`, mặc định `HE_SO_CAT = 0.30` (dòng 1102)
 
 Logic của cắt lỗ: vào tại tường đỡ mà tường đó thủng nghĩa là **giả định gốc sai** — đó mới là điểm vô hiệu, không phải tường đối diện. Đặt cắt lỗ đúng tại tường đối diện là đặt stop ở chỗ chính app dự đoán giá sẽ bật.
 
@@ -203,9 +220,9 @@ Thẻ coin hiển thị kèm hai con số mà mọi tỷ lệ thắng phải đ�
 
 | Nhịp | Chu kỳ | Việc |
 |---|---|---|
-| Phân tích | 2000ms (dòng 1065) | lặp qua **mọi** engine: `aggregate` → `updateWalls` → `analyze` |
-| Vẽ | 1000ms (dòng 1364) | `render()` → `renderLists()`, dựng lại toàn bộ thẻ |
-| Quét OKX | 60000ms (dòng 1466) | xếp hạng coin nóng + `dongBoEngine()` |
+| Phân tích | 2000ms (dòng 1071) | lặp qua **mọi** engine: `aggregate` → `updateWalls` → `analyze` |
+| Vẽ | 1000ms (dòng 1387) | `render()` → `renderLists()`, dựng lại toàn bộ thẻ |
+| Quét OKX | 60000ms (dòng 1489) | xếp hạng coin nóng + `dongBoEngine()` |
 
 Tách nhịp phân tích khỏi nhịp vẽ là có chủ đích. **Đừng gộp lại.**
 
@@ -439,7 +456,7 @@ Hướng dẫn triển khai 6 bước: `php/HUONG-DAN.md`. Trạng thái: **code
 | `php/cham.php` | cron mỗi phút, chấm bằng nến 1m OKX |
 | `php/bao-cao.php` | trang đọc số |
 
-### Luật sinh kèo (`sinhKeo`, dòng 1303)
+### Luật sinh kèo (`sinhKeo`, dòng 1316)
 
 Mỗi nhịp 2 giây, mỗi coin: nếu **chưa có kèo đang mở**, đã hết warmup, có đủ `sup` lẫn `res`, và `|S| ≥ NGUONG_GHI` thì phát một kèo. Hạn = `frameH` giờ. Ra khoảng 20–40 kèo/ngày trên 8 coin và chúng **độc lập** với nhau.
 
@@ -455,9 +472,95 @@ Giá gửi lên dưới dạng **chuỗi `toFixed(15)`** — khớp `DECIMAL(30,
 
 ⚠ **Bẫy phân trang nến đã dính một lần khi viết:** với tham số `before` và `limit=300`, nếu khoảng cần lấy dài hơn 300 nến thì OKX trả 300 cây **mới nhất** chứ không phải 300 cây ngay sau mốc — thủng đoạn giữa mà không báo lỗi. Phải phân trang **lùi** bằng `after`. Cũng dùng `/market/candles` (giữ 1.440 nến 1m = 24h) chứ không phải `/market/history-candles`, và bỏ qua nến chưa đóng (`confirm = '0'`).
 
+## Đợt rà soát trước deploy (2026-08-09) — 12 lỗi đã sửa
+
+25 agent, 5 chiều rà soát + vòng phản biện đối kháng. 16 phát hiện sống sót, 4 bị bác bỏ.
+**Đã sửa 12, còn 4 là rủi ro hạ tầng không sửa được bằng code.**
+
+### Lỗi nặng nhất — chấm điểm cho lệnh CHƯA TỪNG KHỚP
+
+`vao` là **tường ở phía bên kia giá**: kèo LONG vào tại tường đỡ *nằm dưới* giá lúc phát, kèo SHORT vào tại tường kháng *nằm trên* (vì `bestWall` lọc `d > 0`). Đó là **lệnh chờ**, chưa khớp. `cham.php` cũ duyệt nến từ `ts` rồi kiểm chốt lời ngay mà không hề hỏi giá đã quay lại chạm `vao` chưa.
+
+Kịch bản: phát kèo LONG lúc giá 100, vào 98, chốt 104. Giá chạy thẳng lên 105 không quay lại 98 → ghi `thang`, R = 10. Thực tế lệnh chờ ở 98 **không bao giờ khớp**, lãi thật = 0. Vì sai lệch này luôn thuận chiều thị trường, nó thổi phồng kết quả **có hệ thống**.
+
+Đã sửa: thêm cờ `$daKhop`, chỉ bật kiểm chốt lời/cắt lỗ và tích MFE/MAE **sau khi** giá chạm `vao`. Thêm trạng thái `khong_khop` vào ENUM (bị loại khỏi mọi phép tính tỷ lệ thắng, hiện thành cột riêng trên báo cáo — con số này cao nghĩa là tường vào đang đặt quá xa giá).
+
+### Mười một lỗi còn lại đã sửa
+
+| Tệp | Lỗi | Hậu quả nếu để nguyên |
+|---|---|---|
+| `cham.php` | `layNen()` trả mảng rỗng không có lối thoát `bo_qua` | Cron chết > 24h là kèo kẹt `mo` vĩnh viễn; `ORDER BY han_ms ASC LIMIT 60` khiến đám xác chết chiếm hết chỗ → **bộ chấm sổ chết im lặng** |
+| `cham.php` | Đóng sổ ngay khi quy ước CHẠM xong | `kq_dong` kẹt `'mo'` vĩnh viễn (vì `cl <= h` nên quy ước ĐÓNG không bao giờ xong trước) → vô hiệu hoá bảng đo độ nhạy |
+| `cham.php` | MFE/MAE tính cả đoạn sau khi đã thoát lệnh | "Giá tốt nhất từng chạm" thành số vô nghĩa |
+| `cham.php` | Phân trang hỏng giữa chừng vẫn chấm trên tập nến thiếu | Kết quả sai và **đóng sổ vĩnh viễn**. Nay `$loi` là trả `null` để lượt sau thử lại |
+| `cham.php` | Cron chỉ chạy được bằng PHP CLI | Host không có CLI là bó tay. Nay nhận token qua query string |
+| `ghi.php` | Không chặn kèo chồng lấn | `E.keoMo` chỉ ở RAM, F5 là mất → nhiều kèo cùng coin cùng lúc, **không độc lập**, phồng cỡ mẫu giả. Nay chặn ở server |
+| `index.html` | 6 cột tín hiệu không bao giờ `NULL` | "Thiếu dữ liệu" bị ghi thành `0` = "trung tính" — dạy mô hình sau này một điều sai |
+| `index.html` | `cap`/`frame_h` rơi về hằng số 0.03 / 4h khi chưa có nến | Số **bịa** được ghi vào DB như số đo. Nay không phát kèo khi thiếu `market.ranges` |
+| `index.html` | Đường ghi log không có tín hiệu sống nào | Sai token hay sai URL là mất 100% dữ liệu mà không biết. Nay hiện `log: N gửi · N LỖI` trên giao diện |
+| `index.html` | `splice(0, n)` xoá hàng đợi theo vị trí | Trần 40 cắt đầu hàng đợi trong lúc chờ mạng → xoá nhầm kèo chưa gửi. Nay xoá theo `uid` |
+| `bao-cao.php` | `Tổng R` lọc `thang01 IS NOT NULL` | Vứt hết kèo `het_han` (R gần 0) khỏi tổng → **thổi phồng lãi lỗ**. Bảng độ nhạy cũng trừ hai trung bình trên hai mẫu số khác nhau |
+
+### Bốn thứ bị bác bỏ khi kiểm chứng
+
+Kèo bị `ghi.php` từ chối vẫn trả HTTP 200 · `layNen` trả tập thiếu như thể đầy đủ · token nằm trong JS công khai nên vô nghĩa · một dòng lỗi làm hỏng cả lô 50 kèo. Đọc lại code thì cả bốn đều không dựng lại được kịch bản hỏng.
+
+### Chưa sửa được bằng code
+
+Phụ thuộc tuyệt đối vào cURL đi ra ngoài · tần suất cron của gói hosting · `ts`/`han_ms` lấy từ đồng hồ máy client (có `ts_srv` để đối chiếu nhưng chưa có cảnh báo tự động khi lệch).
+
 ## Nhật ký thay đổi
 
 Commit gần nhất trước khi có file này: `5d4e6f7` (máy quét OKX + lãi tự động).
+
+⚠ **Đánh số mục phải liên tục và mới nhất ở TRÊN.** Đã có một lần hai phiên làm việc song song
+cùng đánh số `(13)` và mục mới bị chèn xuống giữa file — đọc từ trên xuống thành ra sai thứ tự
+thời gian. Trước khi thêm mục, kiểm số lớn nhất bằng `grep -n "^- \*\*2026-" CLAUDE.md | head -3`.
+
+- **2026-08-09 (17)** — **Đổi đích deploy sang `zewvir85.hiteckqualityconstruction.com.au`.**
+  Chỉ sửa 1 dòng `API_LOG` ở index.html, không đụng logic.
+  **Lý do đổi:** `worldcup2026.click` và `filexo.online` đều dùng nameserver **Cloudflare**, còn
+  `hiteckqualityconstruction.com.au` dùng `ns*.inet.vn`. Đo bằng `nslookup -type=ns`. Chọn domain
+  quản DNS tại iNET để bớt hai chỗ dễ sai (sửa sai panel, và quên tắt Proxy về xám). Bản ghi gốc
+  `@ A` của nó **vốn đã trỏ đúng `103.75.186.15`**, cùng server hosting.
+  Đánh đổi chấp nhận: endpoint log crypto nằm chung tên miền công ty xây dựng đang hoạt động.
+  **Dọn hai chỗ hỏng của tài liệu:** (a) mục nhật ký của đợt rà soát 25 agent bị đánh số trùng
+  `(13)` và nằm sai vị trí → chuyển thành `(16)` đặt đúng thứ tự; (b) mục trạng thái đang chỉ
+  vào tên miền cũ → viết lại thành 4 bước còn lại kèm cách kiểm từng bước.
+
+- **2026-08-09 (16)** — **Rà soát trước deploy: sửa 12 lỗi.** 1470 → 1493 dòng.
+  Chi tiết ở mục "Đợt rà soát trước deploy" phía trên. Nặng nhất là `cham.php` chấm điểm cho
+  lệnh chờ chưa từng khớp — sai lệch thuận chiều thị trường nên thổi phồng kết quả có hệ thống;
+  đã thêm cờ `$daKhop` và trạng thái `khong_khop`. Kèm hai lỗi làm bộ chấm sổ **chết im lặng**
+  (mảng nến rỗng không có lối thoát, và `kq_dong` kẹt `'mo'` vĩnh viễn).
+  `tao-database.sql` thêm `khong_khop` vào hai ENUM kèm `ALTER ... MODIFY COLUMN` idempotent
+  cho database đã tạo trước đó, và cột dẫn xuất `khong_khop` trong VIEW.
+  **Phát hiện khi kiểm chứng đường ống:** tên miền `zewvir85.worldcup2026.click` **không phân
+  giải được DNS** — đó là lý do app báo lỗi mạng, không phải lỗi CORS hay token. Mục (17) xử lý
+  bằng cách đổi hẳn sang domain khác.
+
+- **2026-08-09 (15)** — Chốt đích deploy và điền `API_LOG`. Không đụng logic, sửa đúng 1 dòng
+  nên index.html vẫn **1470 dòng**.
+  **Hạ tầng thật (ghi lại để phiên sau không phải hỏi):** 1Panel 3.8.81, IP `103.75.186.15`,
+  PHP **8.1** (config.php + 3 file kia chạy tốt, không phải hạ cấp cú pháp), domain chính
+  `hiteckqualityconstruction.com.au` trỏ `/public_html`, domain phụ nằm trong `/domains/<tên>`.
+  **Chọn subdomain riêng thay vì domain chính**, tên `zewvir85` do CSPRNG sinh chứ không phải
+  `coin`: `bao-cao.php` không có mật khẩu nên ai biết URL là đọc được cả sổ kèo — tên khó đoán
+  là lớp bảo vệ yếu nhưng gần như miễn phí.
+  **Chốt lại lần cuối trong phiên: dùng `zewvir85.worldcup2026.click`**, không dùng
+  `hiteckqualityconstruction.com.au`. Chủ dự án có 3 domain ở iNET OnePortal (`portal.inet.vn`):
+  `worldcup2026.click`, `filexo.online`, và domain công ty. Hai cái đầu là domain rời không chạy
+  gì → dùng chúng thì không trộn endpoint log crypto vào tên miền của một công ty xây dựng đang
+  hoạt động.
+  **Phát hiện tránh được một buổi gỡ lỗi vô ích:** DNS ba domain chia **hai chỗ** khác nhau —
+  hai domain rời dùng nameserver **Cloudflare**, chỉ domain công ty dùng `ns*.inet.vn`. Trang
+  *Bản ghi DNS* của `worldcup2026.click` trong iNET hiện **0 bản ghi** không phải vì chưa cấu
+  hình mà vì đó là zone chết. Bảng đối chiếu + lưu ý Proxy status phải để xám đã ghi ở mục
+  "Việc tiếp theo phải làm".
+  **Ghi lại thứ tự bắt buộc dễ làm sai:** 1Panel **không** tạo DNS — phải thêm bản ghi A ở nhà
+  cung cấp domain TRƯỚC, xác nhận `nslookup` ra đúng IP, rồi mới cấp Let's Encrypt được. Hai
+  domain addon sẵn có đang hiện ⚠ vàng, nghi đúng vì bỏ bước này.
+  Không sửa `ORIGIN_CHO_PHEP` vì app chạy `file://` → Origin là `'null'`, vốn đã có trong mảng.
 
 - **2026-08-09 (14)** — **Cấu hình tầng log theo thông tin hosting chủ dự án cung cấp.**
   `php/config.php` điền đủ 4 giá trị (DB `buwsofujhosting_coin_db`, user

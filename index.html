@@ -146,7 +146,7 @@ const SO_COIN = 8;
    Để trống API_LOG là TẮT HẲN việc ghi (app chạy y như cũ, không gọi mạng).
    Điền URL ghi.php sau khi tải thư mục php/ lên hosting, và dán token y hệt
    giá trị API_TOKEN trong php/config.php. */
-const API_LOG   = '';
+const API_LOG   = 'https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php';
 const API_TOKEN = '36crTLiOB7DzTxzxPrUO0yOaVmK8s4rm';
 
 /* Ngưỡng GHI thấp hơn ngưỡng HIỂN THỊ (25) có chủ đích: ghi cả những kèo bị 4
@@ -803,6 +803,12 @@ function analyze(E, A){
             flowConflict, satNoConfirm, warmLeft, phat,
             mua30, ban30, bbOkx: A.bbOkx, baOkx: A.baOkx,
             sig: {f30: sFlow30, f5: sFlow5, bk: sBook, oi: sOi, fu: sFund, lq: sLiq},
+            /* NULL = THIẾU dữ liệu, khác hẳn 0 = trung tính. Ghi 0 cho cả hai là
+               dạy mô hình sau này rằng "không có tin gì" giống "tin trung lập". */
+            sigCo: {f30: true, f5: true, lq: true,
+                    bk: (tb + ta) > 0,
+                    oi: dOi25 !== null,
+                    fu: f8 !== null},
             exMask: EX.reduce((m, e) => m | (E.conns[e.key].state === 'live' ? E.conns[e.key].bit : 0), 0),
             tuoiCoin: E.listTime ? (now - E.listTime) / 86400000 : null};
   const pred = E.pred;
@@ -1264,8 +1270,12 @@ function renderLists(){
     const P = engines[s].pred;
     if (!P.ready || P.warmLeft > 0) am++;
   }
+  const tLog = !API_LOG ? 'log: TẮT'
+    : logStat.loi ? `log: ${logStat.gui} gửi · ${logStat.loi} LỖI (${logStat.loiCuoi})`
+    : `log: ${logStat.gui} gửi${hangDoi.length ? ' · ' + hangDoi.length + ' chờ' : ''}`;
   $('scanNote').textContent = `${syms.length} coin đang theo dõi · ${live}/${syms.length * 4} sàn live`
     + (am ? ` · ${am} chưa ấm máy` : '')
+    + ' · ' + tLog
     + ' · bấm một dòng để ghim / bỏ ghim';
   document.title = `${longs.length}L/${shorts.length}S — Sổ Lệnh Gộp`;
 }
@@ -1291,6 +1301,9 @@ const sp = x => (x === null || x === undefined || !isFinite(x)) ? null : Number(
 
 const hangDoi = [];        /* outbox trong RAM, mất khi F5 — chấp nhận ở bản đầu */
 let dangGui = false;
+/* Đếm để hiển thị: không có tín hiệu sống thì sai token hay sai URL cũng im lặng,
+   chạy cả tuần mới phát hiện bảng rỗng. */
+const logStat = {gui: 0, loi: 0, loiCuoi: ''};
 
 function tinhChan(P){
   /* bitmask 4 chốt chặn. 0 = kèo THẬT (qua hết), >0 = kèo bị chặn */
@@ -1304,6 +1317,9 @@ function sinhKeo(E){
   const P = E.pred;
   if (!P.ready || P.warmLeft > 0) return;
   if (!P.sup || !P.res) return;                       /* không có tường thì không có kèo */
+  /* Chưa có nến 48h thì cap rơi về hằng số 0.03 và frameH về 4 — đó là số BỊA,
+     không phải số đo. Ghi vào DB là đầu độc mẫu ngay từ dòng đầu tiên. */
+  if (!E.market.ranges) return;
   if (Math.abs(P.S) < NGUONG_GHI) return;
   const now = Date.now();
   if (E.keoMo && now < E.keoMo.han) return;           /* mỗi coin một kèo mở tại một thời điểm */
@@ -1313,6 +1329,7 @@ function sinhKeo(E){
   const cat = vao.p + (isLong ? -1 : 1) * HE_SO_CAT * P.cap * P.mid;
   const han = now + P.frameH * 3600e3;
   const tyLe = w => (w.mGop > 0 ? +(w.m / w.mGop).toFixed(4) : null);
+  const sg = n => P.sigCo[n] ? +P.sig[n].toFixed(4) : null;
 
   const k = {
     uid: ulid(), ts: now, coin: E.sym, inst_id: E.sym + '-USDT-SWAP',
@@ -1321,9 +1338,8 @@ function sinhKeo(E){
     mid: sp(P.mid), bid: sp(P.bbOkx), ask: sp(P.baOkx),
     vao: sp(vao.p), chot: sp(chot.p), cat: sp(cat), han_ms: han,
     s: +P.S.toFixed(2),
-    sig_f30: +P.sig.f30.toFixed(4), sig_f5: +P.sig.f5.toFixed(4),
-    sig_bk:  +P.sig.bk.toFixed(4),  sig_oi: +P.sig.oi.toFixed(4),
-    sig_fu:  +P.sig.fu.toFixed(4),  sig_lq: +P.sig.lq.toFixed(4),
+    sig_f30: sg('f30'), sig_f5: sg('f5'), sig_bk: sg('bk'),
+    sig_oi:  sg('oi'),  sig_fu: sg('fu'), sig_lq: sg('lq'),
     book_usd: Math.round(P.bookM), mua30_usd: Math.round(P.mua30), ban30_usd: Math.round(P.ban30),
     cap: +P.cap.toFixed(6), frame_h: P.frameH, ex_mask: P.exMask,
     vao_trust: vao.trust, vao_sv: 0, vao_pl: 0,
@@ -1354,8 +1370,15 @@ async function guiLog(){
     const r = await fetch(API_LOG, {method: 'POST', signal: huy.signal,
       headers: {'Content-Type': 'application/json', 'X-Token': API_TOKEN},
       body: JSON.stringify(lo)});
-    if (r.ok) hangDoi.splice(0, lo.length);          /* gửi hỏng thì GIỮ LẠI, thử lại sau */
-  }catch(e){}
+    /* Xoá theo uid chứ không theo vị trí: nếu trong lúc chờ mạng mà hàng đợi bị
+       cắt bớt ở đầu (khi vượt trần 40) thì splice(0, n) sẽ xoá nhầm kèo CHƯA gửi. */
+    if (r.ok){
+      const daGui = new Set(lo.map(x => x.uid));
+      for (let i = hangDoi.length - 1; i >= 0; i--) if (daGui.has(hangDoi[i].uid)) hangDoi.splice(i, 1);
+      logStat.gui += lo.length;
+    }
+    else { logStat.loi++; logStat.loiCuoi = 'HTTP ' + r.status; }  /* giữ lại, thử lại sau */
+  }catch(e){ logStat.loi++; logStat.loiCuoi = e.name === 'AbortError' ? 'quá 5s' : 'mạng'; }
   finally{ clearTimeout(hetGio); dangGui = false; }
 }
 setInterval(guiLog, 10000);

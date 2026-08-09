@@ -25,7 +25,17 @@ const TRAN_TRANG   = 12;         // tối đa 12 trang x 300 nến = 60 giờ m�
 const HAN_BO_QUA_H = 6;          // quá hạn + 6h mà vẫn không chấm được -> bo_qua
 const CHAY_CLI     = PHP_SAPI === 'cli';
 
-if (!CHAY_CLI) { header('Content-Type: text/plain; charset=utf-8'); kiemTraToken(); }
+if (!CHAY_CLI) {
+    header('Content-Type: text/plain; charset=utf-8');
+    /* Nhiều gói hosting chỉ cho cron gọi URL chứ không có PHP CLI, mà gọi URL thì
+       không gửi được header X-Token. Cho phép token qua query string trong ĐÚNG
+       trường hợp này. Đường dẫn có token nên đừng chia sẻ URL cron cho ai. */
+    if (isset($_GET['token']) && API_TOKEN !== '' && hash_equals(API_TOKEN, (string)$_GET['token'])) {
+        // hợp lệ, đi tiếp
+    } else {
+        kiemTraToken();
+    }
+}
 
 $pdo = db();
 
@@ -41,7 +51,7 @@ try {
     )->fetchAll();
 
     echo count($keos) . " keo dang mo\n";
-    $dem = ['thang'=>0,'thua'=>0,'het_han'=>0,'nhap_nhang'=>0,'bo_qua'=>0,'cho'=>0];
+    $dem = ['thang'=>0,'thua'=>0,'het_han'=>0,'nhap_nhang'=>0,'khong_khop'=>0,'bo_qua'=>0,'cho'=>0];
     $bay = time() * 1000;
 
     foreach ($keos as $k) {
@@ -72,25 +82,32 @@ function chamMotKeo(array $k, int $bay): ?array
     $cat  = (float)$k['cat'];
     $ts   = (int)$k['ts'];
     $han  = (int)$k['han_ms'];
+    $quaHan = $bay >= $han;
 
     $den  = min($bay, $han);
     if ($den <= $ts + MS_NEN) return null;                 // chưa đủ một cây nến
 
     $nen = layNen($k['inst_id'], $ts, $den);
-    if ($nen === null) {
-        /* Không kéo được nến: có thể coin bị hủy niêm yết, hoặc OKX lỗi kéo dài.
-           Quá hạn + 6h vẫn thế thì đóng lại là 'bo_qua' để tập kèo mở không phình
-           mãi và mỗi lượt cron khỏi quét lại hàng trăm dòng chết. */
+
+    /* Không có nến dùng được — hai trường hợp gộp làm một:
+         null  = gọi API hỏng (mạng, OKX lỗi)
+         []    = gọi được nhưng khoảng thời gian đã rơi ra ngoài 1.440 nến mà
+                 /market/candles giữ (tức cron chết > 24 giờ, hoặc đồng hồ client lệch)
+       Trước đây chỉ nhánh null mới có lối thoát 'bo_qua', nhánh mảng rỗng thì
+       return null vô hạn -> kèo kẹt 'mo' vĩnh viễn. Tệ hơn: SELECT sắp theo
+       han_ms ASC nên đám kèo chết luôn đứng đầu, tích đủ 60 con là cron chỉ
+       quét xác chết và không kèo mới nào được chấm nữa — chết im lặng. */
+    if ($nen === null || !$nen) {
         if ($bay > $han + HAN_BO_QUA_H * 3600000) {
             return ['kq'=>'bo_qua','kq_dong'=>'bo_qua','gia_ra'=>null,'ts_ra'=>$bay,
                     'mfe_bp'=>0,'mae_bp'=>0];
         }
         return null;
     }
-    if (!$nen) return null;
 
     $mfe = 0.0; $mae = 0.0;                                 // điểm cơ bản, so với giá vào
     $kqCham = null; $kqDong = null; $giaRa = null; $tsRa = null; $dongCuoi = null;
+    $daKhop = false;
 
     foreach ($nen as $c) {
         [$t, $o, $h, $l, $cl] = $c;
@@ -98,12 +115,26 @@ function chamMotKeo(array $k, int $bay): ?array
         if ($t > $han) break;
         $dongCuoi = $cl;
 
-        /* MFE/MAE: giá TỐT nhất và XẤU nhất kèo từng chạm, quy về điểm cơ bản.
-           Gần như miễn phí vì đằng nào cũng phải quét hết nến. */
-        $tot  = $dir > 0 ? $h : $l;
-        $xau  = $dir > 0 ? $l : $h;
-        $mfe  = max($mfe, ($tot - $vao) * $dir / $vao * 10000);
-        $mae  = min($mae, ($xau - $vao) * $dir / $vao * 10000);
+        /* ===== CHỜ LỆNH KHỚP ĐÃ =====
+           `vao` là tường ở PHÍA BÊN KIA giá lúc phát kèo: kèo LONG vào tại tường
+           đỡ NẰM DƯỚI giá, kèo SHORT vào tại tường kháng NẰM TRÊN. Đó là lệnh
+           CHỜ, chưa khớp. Nếu giá chạy thẳng tới chốt lời mà không quay lại chạm
+           `vao` thì lệnh KHÔNG BAO GIỜ vào — chấm nó là "thắng" là bịa ra một
+           khoản lãi chưa từng tồn tại, và sai lệch này thuận chiều thị trường
+           nên nó thổi phồng kết quả một cách CÓ HỆ THỐNG. */
+        if (!$daKhop) {
+            $daKhop = $dir > 0 ? ($l <= $vao) : ($h >= $vao);
+            if (!$daKhop) continue;                         // chưa vào lệnh, chưa tính gì
+        }
+
+        /* MFE/MAE chỉ tính TRONG LÚC ĐANG CẦM LỆNH — trước đây tính cả đoạn giá
+           sau khi đã thoát, làm "giá tốt nhất từng chạm" thành số vô nghĩa. */
+        if ($kqCham === null) {
+            $tot = $dir > 0 ? $h : $l;
+            $xau = $dir > 0 ? $l : $h;
+            $mfe = max($mfe, ($tot - $vao) * $dir / $vao * 10000);
+            $mae = min($mae, ($xau - $vao) * $dir / $vao * 10000);
+        }
 
         // --- quy ước CHẠM (bóng nến) ---
         $chamTP = $dir > 0 ? ($h >= $chot) : ($l <= $chot);
@@ -127,16 +158,24 @@ function chamMotKeo(array $k, int $bay): ?array
         if ($kqCham !== null && $kqDong !== null) break;
     }
 
-    $quaHan = $bay >= $han;
-    if ($kqCham === null) {
-        if (!$quaHan) return null;                          // còn thời gian, để lần sau
-        /* HẾT HẠN KHÔNG PHẢI THUA: kèo đứng yên rồi hết giờ có R gần 0, khác hẳn
-           kèo chạm cắt lỗ (-1R). Gộp chung là đánh giá oan chiến lược. */
-        $kqCham = 'het_han';
-        $giaRa  = $dongCuoi;
-        $tsRa   = $han;
+    /* Lệnh chờ không bao giờ khớp — KHÔNG phải thắng, thua, hay hết hạn.
+       Phải là nhóm riêng và phải bị loại khỏi mọi phép tính tỷ lệ thắng. */
+    if (!$daKhop) {
+        if (!$quaHan) return null;
+        return ['kq'=>'khong_khop','kq_dong'=>'khong_khop','gia_ra'=>null,'ts_ra'=>$han,
+                'mfe_bp'=>0,'mae_bp'=>0];
     }
-    if ($kqDong === null) $kqDong = $quaHan ? 'het_han' : 'mo';
+
+    /* CHƯA CHỐT SỔ khi một trong hai quy ước còn bỏ ngỏ và vẫn còn hạn.
+       Vì cl <= h luôn đúng nên quy ước ĐÓNG không bao giờ ngã ngũ TRƯỚC quy ước
+       CHẠM; đóng dòng ngay khi CHẠM xong sẽ khoá kq_dong ở 'mo' vĩnh viễn
+       (SELECT chỉ tìm kq='mo') và vô hiệu hoá luôn bảng đo độ nhạy quy ước.
+       Chấm lại từ nến là tất định nên chạy lại nhiều lượt vẫn ra đúng một kết quả. */
+    if ($kqCham === null || $kqDong === null) {
+        if (!$quaHan) return null;
+        if ($kqCham === null) { $kqCham = 'het_han'; $giaRa = $dongCuoi; $tsRa = $han; }
+        if ($kqDong === null) $kqDong = 'het_han';
+    }
 
     return ['kq'=>$kqCham, 'kq_dong'=>$kqDong, 'gia_ra'=>$giaRa,
             'ts_ra'=>$tsRa ?? $han, 'mfe_bp'=>(int)round($mfe), 'mae_bp'=>(int)round($mae)];
@@ -174,7 +213,10 @@ function layNen(string $instId, int $tsTu, int $tsDen): ?array
         if ($cuNhat <= $tsTu || $cuNhat === PHP_INT_MAX) break;   // đã lùi đủ xa
         $moc = $cuNhat;
     }
-    if ($loi && !$ra) return null;                                // hỏng hẳn, chưa lấy được gì
+    /* Một trang phân trang hỏng giữa chừng = tập nến THIẾU ĐOẠN. Chấm trên đó sẽ
+       ra kết quả sai và ĐÓNG SỔ VĨNH VIỄN, không bao giờ sửa lại được. Thà trả
+       null để lượt cron sau thử lại còn hơn ghi một kết quả sai tự tin. */
+    if ($loi) return null;
     usort($ra, fn($a, $b) => $a[0] <=> $b[0]);                    // cũ -> mới
     return $ra;
 }

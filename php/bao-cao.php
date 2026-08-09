@@ -28,13 +28,28 @@ function pc(?float $x, int $d = 1): string { return $x === null ? '—' : number
 function so(?float $x, int $d = 2): string { return $x === null ? '—' : number_format($x, $d); }
 function h(?string $x): string { return htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8'); }
 
+/* Cột tỷ lệ thắng tính trên kèo THẮNG/THUA; cột R tính trên MỌI kèo có R —
+   gồm cả het_han (R gần 0). Lọc chung bằng thang01 IS NOT NULL sẽ vứt hết
+   het_han khỏi Tổng R và thổi phồng con số lãi lỗ.
+   Cột độ nhạy quy ước phải tính trên ĐÚNG CÙNG một tập dòng, nếu không là trừ
+   hai trung bình của hai mẫu số khác nhau. */
 $tong = $q("SELECT
       nhom,
-      COUNT(*) n, SUM(thang01) dung,
-      AVG(thang01) tl, AVG(p_baseline) base, AVG(rr_du_kien) rr,
-      SUM(r_sau_phi) tongR, AVG(r_sau_phi) kv,
-      AVG(thang01_dong) tl_dong, AVG(chot_bp) chot_bp, AVG(spread_bp) spread_bp
-    FROM v_keo WHERE thang01 IS NOT NULL GROUP BY nhom");
+      SUM(thang01 IS NOT NULL)                                    n,
+      SUM(thang01)                                                dung,
+      AVG(thang01)                                                tl,
+      AVG(CASE WHEN thang01 IS NOT NULL THEN p_baseline END)      base,
+      AVG(CASE WHEN thang01 IS NOT NULL THEN rr_du_kien END)      rr,
+      SUM(r_sau_phi)                                              tongR,
+      AVG(r_sau_phi)                                              kv,
+      COUNT(r_sau_phi)                                            n_r,
+      SUM(khong_khop)                                             n_khong_khop,
+      AVG(CASE WHEN thang01 IS NOT NULL AND thang01_dong IS NOT NULL THEN thang01 END)      tl_cap,
+      AVG(CASE WHEN thang01 IS NOT NULL AND thang01_dong IS NOT NULL THEN thang01_dong END) tl_dong,
+      SUM(thang01 IS NOT NULL AND thang01_dong IS NOT NULL)       n_cap,
+      AVG(CASE WHEN thang01 IS NOT NULL THEN chot_bp END)         chot_bp,
+      AVG(CASE WHEN thang01 IS NOT NULL THEN spread_bp END)       spread_bp
+    FROM v_keo WHERE kq <> 'mo' GROUP BY nhom");
 
 $trangThai = $q("SELECT kq, COUNT(*) n FROM keo GROUP BY kq");
 $tongDong  = (int)$pdo->query("SELECT COUNT(*) FROM keo")->fetchColumn();
@@ -63,6 +78,7 @@ $nThat = 0; foreach ($tong as $r) if ($r['nhom'] === 'that') $nThat = (int)$r['n
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Báo cáo tỷ lệ thắng — Sổ Lệnh Gộp</title>
 <style>
+/* .w1 = vàng cảnh báo */
 :root{--bg:#0a0d12;--panel:#141922;--line:#242c38;--text:#e8ecf1;--dim:#7f8996;--dim2:#5c6674;
       --green:#0ecb81;--red:#f6465d;--amber:#e2b93b;--mono:ui-monospace,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -80,7 +96,7 @@ th{background:#191f29;color:var(--dim2);font-size:10px;letter-spacing:.4px;text-
 th:first-child,td:first-child{text-align:left}
 td{padding:7px 10px;text-align:right;border-top:1px solid rgba(255,255,255,.04);font-family:var(--mono)}
 td:first-child{font-family:system-ui,sans-serif}
-.up{color:var(--green)}.dn{color:var(--red)}.dim{color:var(--dim2)}
+.up{color:var(--green)}.dn{color:var(--red)}.dim{color:var(--dim2)}.w1{color:var(--amber)}
 .note{color:var(--dim2);font-size:11.5px;margin-top:6px;line-height:1.6}
 </style></head><body>
 
@@ -99,8 +115,8 @@ td:first-child{font-family:system-ui,sans-serif}
 
 <h2>TỔNG — nhóm "thật" là kèo qua hết 4 chốt chặn, "bóng" là kèo bị chặn</h2>
 <table><tr><th>Nhóm</th><th>n</th><th>Đúng</th><th>Tỷ lệ thắng</th><th>Baseline</th>
-<th>Hơn ngẫu nhiên</th><th>Wilson 95%</th><th>R:R TB</th><th>Tổng R sau phí</th><th>KV/kèo</th>
-<th>Chốt (bp)</th><th>Spread (bp)</th></tr>
+<th>Hơn ngẫu nhiên</th><th>Wilson 95%</th><th>R:R TB</th><th>Tổng R sau phí</th><th>n có R</th><th>KV/kèo</th>
+<th>Không khớp</th><th>Chốt (bp)</th><th>Spread (bp)</th></tr>
 <?php foreach ($tong as $r):
   $n=(int)$r['n']; $k=(int)$r['dung']; [$lo,$hi]=wilson($k,$n);
   $delta = $r['tl']!==null && $r['base']!==null ? (float)$r['tl']-(float)$r['base'] : null; ?>
@@ -110,21 +126,25 @@ td:first-child{font-family:system-ui,sans-serif}
 <td class="dim"><?= pc($lo) ?> – <?= pc($hi) ?></td>
 <td><?= so((float)$r['rr']) ?></td>
 <td class="<?= (float)$r['tongR']>0?'up':'dn' ?>"><?= so((float)$r['tongR']) ?></td>
+<td class="dim"><?= (int)$r['n_r'] ?></td>
 <td class="<?= (float)$r['kv']>0?'up':'dn' ?>"><?= so((float)$r['kv'],3) ?></td>
+<td class="<?= (int)$r['n_khong_khop']>0?'w1':'dim' ?>"><?= (int)$r['n_khong_khop'] ?></td>
 <td class="dim"><?= so((float)$r['chot_bp'],0) ?></td><td class="dim"><?= so((float)$r['spread_bp'],1) ?></td></tr>
-<?php endforeach; if(!$tong): ?><tr><td colspan="12" class="dim">Chưa có kèo nào được chấm.</td></tr><?php endif; ?>
+<?php endforeach; if(!$tong): ?><tr><td colspan="14" class="dim">Chưa có kèo nào được chấm.</td></tr><?php endif; ?>
 </table>
 <div class="note"><b>Hơn ngẫu nhiên</b> = tỷ lệ thắng − baseline. Đây là con số duy nhất đáng đọc:
 baseline là xác suất chạm chốt trước nếu giá đi hoàn toàn ngẫu nhiên, tính từ khoảng cách
 tới chốt và tới cắt lỗ. Số này ≤ 0 nghĩa là máy không hơn gì tung đồng xu.
-Cột <b>Tổng R sau phí</b> mới là thứ quyết định lãi lỗ, không phải tỷ lệ thắng.</div>
+Cột <b>Tổng R sau phí</b> mới là thứ quyết định lãi lỗ, không phải tỷ lệ thắng — nó tính trên cả kèo hết hạn (R gần 0), nên <b>n có R</b> lớn hơn <b>n</b>.<br><b>Không khớp</b> = lệnh chờ tại giá vào không bao giờ khớp trong hạn, tức kèo chưa từng tồn tại. Nhóm này bị loại khỏi mọi phép tính; con số này cao nghĩa là tường vào đang được đặt quá xa giá.</div>
 
 <h2>ĐỘ NHẠY THEO QUY ƯỚC CHẤM</h2>
-<table><tr><th>Nhóm</th><th>Chạm (bóng nến)</th><th>Đóng nến vượt hẳn</th><th>Chênh</th></tr>
+<table><tr><th>Nhóm</th><th>n (cả hai quy ước đã chấm)</th><th>Chạm (bóng nến)</th><th>Đóng nến vượt hẳn</th><th>Chênh</th></tr>
 <?php foreach ($tong as $r):
-  $d = $r['tl']!==null && $r['tl_dong']!==null ? (float)$r['tl']-(float)$r['tl_dong'] : null; ?>
-<tr><td><?= h($r['nhom']) ?></td><td><?= pc((float)$r['tl']) ?></td><td><?= pc($r['tl_dong']===null?null:(float)$r['tl_dong']) ?></td>
-<td class="<?= abs((float)$d)>0.05?'dn':'dim' ?>"><?= $d===null?'—':number_format($d*100,1).'%' ?></td></tr>
+  $d = $r['tl_cap']!==null && $r['tl_dong']!==null ? (float)$r['tl_cap']-(float)$r['tl_dong'] : null; ?>
+<tr><td><?= h($r['nhom']) ?></td><td class="dim"><?= (int)$r['n_cap'] ?></td>
+<td><?= pc($r['tl_cap']===null?null:(float)$r['tl_cap']) ?></td>
+<td><?= pc($r['tl_dong']===null?null:(float)$r['tl_dong']) ?></td>
+<td class="<?= $d!==null && abs($d)>0.05?'dn':'dim' ?>"><?= $d===null?'—':number_format($d*100,1).'%' ?></td></tr>
 <?php endforeach; ?></table>
 <div class="note">Chênh lệch quá <b>5 điểm phần trăm</b> nghĩa là kết luận phụ thuộc vào quy ước
 chấm chứ không phụ thuộc vào máy — lúc đó đừng tin con số nào cả.</div>

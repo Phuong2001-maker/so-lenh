@@ -51,22 +51,18 @@ ngoài thư mục web rồi sửa dòng `require` trong 3 file kia.
 
 ## 4. Nối app với server
 
-Mở `index.html` dòng 149–150:
+✅ **Bước này đã làm xong.** `index.html` dòng 149–150 đã trỏ tới:
 
 ```
-const API_LOG   = '';    → CÒN TRỐNG, phải điền
-const API_TOKEN = '...'; → ✅ đã điền, khớp config.php
+const API_LOG = 'https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php';
 ```
 
-Chủ dự án chạy app bằng `file://` từ máy tính, nên `API_LOG` phải là **URL tuyệt đối**:
-
-```
-const API_LOG = 'https://<tên-miền-hosting>/php/ghi.php';
-```
-
-Đường dẫn tương đối (`php/ghi.php`) **chỉ dùng được** khi index.html cũng nằm trên hosting.
+URL **tuyệt đối** vì app chạy bằng `file://` từ máy tính — đường dẫn tương đối (`php/ghi.php`)
+chỉ dùng được khi index.html cũng nằm trên hosting. Đổi tên subdomain thì phải sửa lại dòng này.
 
 Để trống `API_LOG` là tắt hẳn việc ghi, app chạy y như cũ.
+
+⚠ Chạy bằng `file://` nghĩa là app **không** ghi 24/7 — chỉ ghi khi có tab trình duyệt đang mở.
 
 ⚠ Chạy bằng `file://` nghĩa là app **không** ghi 24/7 — chỉ ghi khi có tab trình duyệt đang mở.
 

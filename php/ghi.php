@@ -46,7 +46,7 @@ try {
          . ' ON DUPLICATE KEY UPDATE id = id';
     $st = $pdo->prepare($sql);
 
-    $nhan = 0; $trung = 0; $bo = [];
+    $nhan = 0; $trung = 0; $chongLap = 0; $bo = []; $stKt = null;
     foreach ($lo as $i => $k) {
         if (!is_array($k)) { $bo[] = "[$i] khong phai object"; continue; }
         $thieu = array_values(array_filter(BAT_BUOC, fn($c) => !isset($k[$c]) || $k[$c] === ''));
@@ -61,10 +61,23 @@ try {
         foreach (['mid','bid','ask','vao','chot','cat'] as $c) {
             if ($tv[$c] !== null) $tv[$c] = (string)$tv[$c];
         }
+        /* Client giữ "kèo đang mở" trong RAM nên F5 hoặc máy quét đổi coin là mất,
+           sinh ra kèo chồng lấn trên cùng một coin — và kèo chồng lấn KHÔNG độc lập
+           với nhau, đúng thứ làm cỡ mẫu phồng giả. Chốt chặn thật phải ở server. */
+        if ($stKt === null) {
+            $stKt = $pdo->prepare(
+                "SELECT 1 FROM keo WHERE coin = :coin AND loai = :loai AND chan = :chan
+                   AND kq = 'mo' AND han_ms > :ts LIMIT 1");
+        }
+        $stKt->execute([':coin' => $tv['coin'], ':loai' => $tv['loai'],
+                        ':chan' => (int)$tv['chan'], ':ts' => (int)$tv['ts']]);
+        if ($stKt->fetchColumn()) { $chongLap++; continue; }
+
         $st->execute($tv);
         if ($st->rowCount() > 0) $nhan++; else $trung++;
     }
-    traLoi(200, ['ok' => true, 'nhan' => $nhan, 'trung' => $trung, 'bo' => $bo]);
+    traLoi(200, ['ok' => true, 'nhan' => $nhan, 'trung' => $trung,
+                 'chong_lap' => $chongLap, 'bo' => $bo]);
 
 } catch (Throwable $e) {
     error_log('[ghi.php] ' . $e->getMessage());
