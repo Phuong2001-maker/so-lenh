@@ -125,8 +125,12 @@ tail -2 ~/bot/bot.log            # dòng cuối phải trong vòng 1 phút
 ```
 
 ```sql
-SELECT MAX(cham_luc) lan_cham_cuoi, NOW() gio_server FROM keo;   -- lệch < 2 phút
+-- Phải ra 0. Có kèo quá hạn > 2 phút mà chưa chấm = cron đã chết.
+SELECT COUNT(*) AS keo_qua_han_chua_cham
+FROM keo WHERE kq='mo' AND han_ms < (UNIX_TIMESTAMP()*1000 - 120000);
 ```
+
+⚠ **Đừng dùng `MAX(cham_luc)` so `NOW()`** — `cham_luc` chỉ ghi khi một kèo thật sự được chấm, mà kèo có hạn 1–4 giờ, nên nó cũ hàng giờ là bình thường. Dùng nó làm nhịp tim sẽ báo động giả.
 
 Câu đầu giám sát bot (bên ghi), câu sau giám sát cron (bên chấm). Hai bên chết độc lập nhau, phải xem cả hai.
 

@@ -1471,7 +1471,17 @@ function veChuThich(){
       t = '⛔ CHƯA TẢI ĐƯỢC trangthai.json — bot có đang chạy không?';
     else if (tre > 30)
       t = `⛔ DỮ LIỆU CŨ ${tre}s — bot có thể đã chết, ĐỪNG đọc số bên dưới`;
-    else t = `XEM · dữ liệu ${tre}s trước · ` + t;
+    else {
+      /* Bot sống nhưng bộ CHẤM chết là kiểu hỏng riêng, và im lặng hơn hẳn: mọi
+         số trên trang này vẫn đúng và vẫn tươi, chỉ có bảng `keo` là ngừng nhận
+         nhãn. Không có dòng cảnh báo này thì đi vắng hai tuần về mới biết. */
+      const phutCham = (cham && cham.lucOk) ? Math.round((lucBot - cham.lucOk) / 60000) : null;
+      if (cham && phutCham !== null && phutCham > 10)
+        t = `⛔ CHẤM SỔ IM ${phutCham} PHÚT — kèo đang kẹt "mo", dữ liệu sẽ KHÔNG CÓ NHÃN`;
+      else if (cham && cham.loiCuoi)
+        t = `⚠ chấm sổ lỗi: ${cham.loiCuoi} · ` + `XEM · dữ liệu ${tre}s trước · ` + t;
+      else t = `XEM · dữ liệu ${tre}s trước · ` + t;
+    }
   }
   $('scanNote').textContent = t;
 }
@@ -1514,6 +1524,11 @@ function renderLists(){
    napLoi     = lý do nạp thất bại, để phân biệt "không tải được" với "tải được
                 nhưng ảnh sai cấu trúc" — hai thứ này cần hai hướng xử lý khác nhau. */
 let lucBot = 0, mocAnhMoi = 0, verBot = '', napLoi = '';
+/* Sức khoẻ bộ chấm sổ, do bot.js gắn vào ảnh. Bot ghi kèo và cron chấm kèo là hai
+   đường CHẾT ĐỘC LẬP: cron chết thì bot vẫn ghi, trang vẫn xanh "dữ liệu 1s trước",
+   mà mọi kèo kẹt `mo` vô thời hạn — hai tuần dữ liệu không có nhãn nào. Đây là chỗ
+   duy nhất phát hiện được chuyện đó mà chỉ cần mở link. */
+let cham = null;
 
 /* "Giờ hiện tại" theo đồng hồ đã đặt các mốc: bot thì là đồng hồ của chính nó,
    trang xem thì là đồng hồ bot đọc từ ảnh. */
@@ -1592,6 +1607,7 @@ function napTrangThai(j){
 
   napLoi = '';
   verBot = j.ver || '';
+  cham = j.cham || null;
   for (const k in engines) delete engines[k];
   /* Coin chưa ấm máy vẫn có mặt (chỉ mang conns + pred.ready=false): bảng QUÉT vẫn
      đánh dấu ▶ đúng, số "chưa ấm máy" đếm đúng, mà keoCua() vẫn trả null nên chúng

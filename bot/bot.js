@@ -44,9 +44,14 @@ const FILE_ANH   = path.join(GOC_WEB, 'trangthai.json');
 const FILE_TOKEN = path.join(__dirname, 'token.txt');
 const FILE_GHIM  = path.join(__dirname, 'ghim.txt');
 
+/* URL cham.php — dùng cho việc CHẤM SỔ DỰ PHÒNG, xem mục goiCham() ở dưới. */
+const URL_CHAM = process.env.URL_CHAM
+  || 'https://zewvir85.hiteckqualityconstruction.com.au/php/cham.php';
+
 const NHIP_ANH  = 2000;    /* ghi ảnh trạng thái — đúng bằng nhịp phân tích */
 const NHIP_GHIM = 30000;   /* đọc lại ghim.txt */
 const NHIP_LOG  = 60000;   /* in một dòng sức khoẻ vào bot.log */
+const NHIP_CHAM = 60000;   /* gọi cham.php dự phòng */
 
 /* ---------------------------------------------------------------- ghi log */
 const gio = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -175,11 +180,68 @@ let anhLoi = 0;
 
 function ghiAnh(){
   try{
-    const j = JSON.stringify(API.anhTrangThai());
+    const o = API.anhTrangThai();
+    /* Gắn sức khoẻ bộ chấm vào ảnh: đây là thứ DUY NHẤT cho phép phát hiện
+       "chấm sổ đã chết" mà chỉ cần mở link, không cần SSH hay SQL — quan trọng
+       khi chủ dự án đi vắng nhiều ngày. bot.js gắn ở đây thay vì để index.html
+       tự làm, vì index.html không biết gì về tiến trình bot. */
+    o.cham = {ok: chamStat.ok, boQua: chamStat.boQua, loi: chamStat.loi,
+              lucOk: chamStat.lucOk, loiCuoi: chamStat.loiCuoi};
+    const j = JSON.stringify(o);
     fs.writeFileSync(FILE_TAM, j);
     fs.renameSync(FILE_TAM, FILE_ANH);
     anhLoi = 0;
   }catch(e){ anhLoi = ghiLoi('ghi anh loi', e); }
+}
+
+/* ------------------------------------------------- CHẤM SỔ DỰ PHÒNG
+   Bot tự gọi `cham.php` mỗi phút, SONG SONG với cron.
+
+   VÌ SAO CẦN: hiện cron đỡ bot (cron bật lại bot nếu bot chết), nhưng KHÔNG AI
+   ĐỠ CRON. Nếu crontab bị ghi lại, dịch vụ cron của hosting chết, hay lệnh bắt
+   đầu fail âm thầm (hosting nâng cấp PHP làm `php` rơi khỏi PATH hẹp của cron —
+   kiểu phổ biến nhất), thì: bot vẫn ghi kèo bình thường, trang xem vẫn xanh với
+   "dữ liệu 1s trước", mà KHÔNG AI CHẤM. Mọi kèo kẹt `kq='mo'` vô thời hạn. Với
+   một đợt treo hai tuần, đó là hai tuần dữ liệu KHÔNG CÓ NHÃN — mất trắng đúng
+   mục đích thu thập, và không backfill lại được vì nến 1m của OKX chỉ giữ 24h.
+
+   Bot là tiến trình chạy dài ĐỘC LẬP với cron, nên nó bù đúng vào lỗ đó. Hai bên
+   đỡ nhau chéo: cron đỡ bot, bot đỡ cron.
+
+   CHẠY SONG SONG AN TOÀN: `cham.php` mở đầu bằng `GET_LOCK('cham_keo', 0)` —
+   timeout 0 nên gặp tiến trình khác đang chấm là nó in "dang co tien trinh khac
+   chay" rồi thoát ngay, không chờ, không ghi đè. Thêm nữa mọi câu UPDATE đều kèm
+   `AND kq='mo'` rồi kiểm `rowCount`, nên không thể chấm trùng một kèo.
+
+   Dùng header `X-Token` chứ không `?token=`: query string bị ghi vào access log
+   của web server, còn header thì không. */
+let dangCham = false;
+const chamStat = {ok: 0, boQua: 0, loi: 0, lucOk: 0, loiCuoi: ''};
+
+async function goiCham(){
+  if (dangCham) return;              /* lượt trước chưa xong — đừng dồn */
+  dangCham = true;
+  const huy = new AbortController();
+  const hetGio = setTimeout(() => huy.abort(), 50000);
+  try{
+    const r = await fetch(URL_CHAM, {signal: huy.signal, headers: {'X-Token': token}});
+    const t = await r.text();
+    if (!r.ok){
+      chamStat.loi++;
+      chamStat.loiCuoi = 'HTTP ' + r.status;
+      ghiLoi('cham loi', new Error('HTTP ' + r.status + ' — token lech?'));
+    } else if (t.includes('tien trinh khac')){
+      /* Cron đang chấm ngay lúc này. Đây là dấu hiệu KHOẺ, không phải lỗi:
+         nghĩa là đường chấm chính vẫn sống nên bot không cần làm gì. */
+      chamStat.boQua++; chamStat.lucOk = Date.now(); chamStat.loiCuoi = '';
+    } else {
+      chamStat.ok++; chamStat.lucOk = Date.now(); chamStat.loiCuoi = '';
+    }
+  }catch(e){
+    chamStat.loi++;
+    chamStat.loiCuoi = String((e && e.message) || e);
+    ghiLoi('cham loi', e);
+  }finally{ clearTimeout(hetGio); dangCham = false; }
 }
 
 /* ------------------------------------------------------------ ghim từ file
@@ -242,10 +304,17 @@ function inSucKhoe(){
       canh.push(`socket thanh ly im ${Math.round((Date.now() - Q.lastMsg) / 1000)}s`);
   }
 
+  /* Bộ chấm: quá 10 phút không có lượt nào thành công nghĩa là CẢ cron LẪN đường
+     dự phòng của bot đều chết — kèo sẽ kẹt `mo` và dữ liệu thành vô nhãn. */
+  if (chamStat.loiCuoi) canh.push(`cham so loi: ${chamStat.loiCuoi}`);
+  if (chamStat.lucOk && Date.now() - chamStat.lucOk > 600000)
+    canh.push(`CHAM SO IM ${Math.round((Date.now() - chamStat.lucOk) / 60000)} phut`);
+
   ghi(`${syms.length} coin · ${live}/${syms.length * 4} san live · ${am} chua am`
     + (chet ? ` · ${chet} mat so` : '')
     + ` · log ${L.gui} gui/${L.loi} loi${L.cho ? '/' + L.cho + ' cho' : ''}`
     + (L.mat ? `/${L.mat} MAT` : '')
+    + ` · cham ${chamStat.ok}ok/${chamStat.boQua}cron/${chamStat.loi}loi`
     + ` · RAM ${Math.round(process.memoryUsage().rss / 1048576)}MB`);
   if (canh.length){ ghi('!! CANH BAO:', canh.join(' | ')); xoayLog(); }
 }
@@ -257,6 +326,12 @@ const t1 = setInterval(ghiAnh, NHIP_ANH);
 const t2 = setInterval(napGhim, NHIP_GHIM);
 const t3 = setInterval(inSucKhoe, NHIP_LOG);
 
+/* Lượt chấm đầu lùi 45 giây: (a) chờ warmup xong đã, (b) lệch pha với cron chạy
+   ở giây :00 nên hai bên ít giành khoá của nhau — không phải vấn đề đúng đắn, chỉ
+   là bớt lượt chạy vô ích. */
+let t4 = null;
+const t5 = setTimeout(() => { goiCham(); t4 = setInterval(goiCham, NHIP_CHAM); }, 45000);
+
 /* Dọn khi bị tắt: xoá file tạm để lần chạy sau không thấy rác, và ghi một dòng
    vào log để phân biệt "bị tắt có chủ đích" với "chết bất thường" — không có
    dòng này thì sau vài ngày không cách nào biết bot dừng vì sao. */
@@ -264,6 +339,7 @@ for (const sig of ['SIGINT', 'SIGTERM']){
   process.on(sig, () => {
     ghi('nhan', sig, '- dung bot.');
     clearInterval(t1); clearInterval(t2); clearInterval(t3);
+    clearTimeout(t5); if (t4) clearInterval(t4);
     try { fs.unlinkSync(FILE_TAM); } catch(e){}
     process.exit(0);
   });

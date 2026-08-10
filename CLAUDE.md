@@ -48,14 +48,19 @@ Mục đích: mở chat mới, AI đọc đúng file này là hiểu ngay dự �
 
 Bot Node chạy nền trên hosting, **không cần máy nào bật**. Xác nhận từ ngoài internet:
 
+Trạng thái lúc bàn giao (2026-08-10 10:08) — **vòng lặp đầy đủ đã chạy: bot ghi → bộ chấm gắn nhãn → trang báo cáo đọc được**:
+
 | | |
 |---|---|
-| Tuổi ảnh trạng thái | 1 giây (bot ghi đúng nhịp 2 giây) |
-| Coin / sàn | 8 coin · 30/32 sàn live |
-| Log | 6 gửi / **0 lỗi** / 0 mất / 0 thiếu nến |
-| Socket thanh lý | gói tin 5 giây trước, không lỗi |
-| Máy quét OKX | 35 giây trước, 0 lỗi |
-| RAM | ~117 MB |
+| Kèo | 8 ghi · **mo 4 · thắng 1 · thua 3** ← đã có NHÃN, không chỉ ghi |
+| Tuổi ảnh trạng thái | 1–2 giây (bot ghi đúng nhịp 2 giây) |
+| Coin / sàn | 8 coin · **32/32 sàn live** |
+| Log | 0 lỗi / 0 mất / 0 thiếu nến |
+| Chấm sổ dự phòng | `ok 1 · cron 0 · loi 0` |
+| Socket thanh lý · máy quét | không lỗi |
+| RAM | 118 → 141 MB sau 10 phút |
+
+⚠ **RAM tăng 118 → 141 MB trong 10 phút — chưa kiểm chứng được profile dài hạn.** Mọi mảng đã có trần (`flowSec`/`liqs` 20.000 + cắt theo thời gian, `oiHist` 240, `wallBook` dọn 24h, `hangDoi` 500) nên có thể chỉ là heap V8 nở rồi phẳng. Nhưng **không kết luận từ mẫu 10 phút được**. Ba lớp đỡ: quota 2 GB nên còn rất xa; bot chết vì hết bộ nhớ thì cron bật lại trong 1 phút; và dòng sức khoẻ in RAM mỗi phút nên đọc `bot.log` là thấy xu hướng. Về sau nên xem `RAM` trong `bot.log` sau vài ngày để chốt.
 
 **Hai cron trên hosting** (1Panel → Tính năng nâng cao → Công việc Cron):
 
@@ -91,13 +96,18 @@ Cron dùng `curl` chứ không `php` CLI — vì đường HTTP đã kiểm ch�
 ⚠ Nếu về sau số kèo mở lên hàng trăm và lần chấm quá thời gian chờ của web, đổi sang PHP CLI — không giới hạn thời gian và không để token trong crontab:
 `php /home/buwsofujhosting/domains/zewvir85.hiteckqualityconstruction.com.au/php/cham.php`
 
-**Câu kiểm sức khoẻ cron** (chạy định kỳ, đây là lý do cột `cham_luc` tồn tại):
+**Câu kiểm sức khoẻ cron chấm sổ:**
 
 ```sql
-SELECT MAX(cham_luc) AS lan_cham_cuoi, NOW() AS gio_server FROM keo;
+SELECT COUNT(*) AS keo_qua_han_chua_cham
+FROM keo WHERE kq = 'mo' AND han_ms < (UNIX_TIMESTAMP()*1000 - 120000);
 ```
 
-Lệch dưới 2 phút là khoẻ. Lệch hàng giờ = cron chết, mà **trang báo cáo vẫn trông bình thường** nên không có cách nào khác để phát hiện.
+Ra **0** là khoẻ. Ra > 0 nghĩa là có kèo quá hạn hơn 2 phút mà chưa ai chấm — chỉ xảy ra khi cron chết. Cron chết là hỏng **im lặng**: trang báo cáo vẫn trông bình thường, chỉ là số kèo đã chấm không tăng nữa.
+
+⚠ **ĐỪNG dùng `MAX(cham_luc)` so với `NOW()` làm nhịp tim của cron.** Đã ghi sai trong tài liệu này một thời gian và nó sinh báo động giả. `cham_luc` chỉ được ghi bên trong `luuKetQua()` của `cham.php`, tức **chỉ khi một kèo thật sự được chấm xong** — cron chạy đủ mỗi phút mà không kèo nào tới hạn thì cột đó không nhích. Kèo có hạn 1–4 giờ nên `MAX(cham_luc)` cũ hàng giờ là hoàn toàn bình thường.
+
+`cham_luc` vẫn hữu ích, nhưng để trả lời câu khác: *"kèo này được chấm lúc nào"* — dùng khi truy vết một kèo cụ thể, không dùng để giám sát tiến trình.
 
 ### Mốc quay lại xem dữ liệu
 
@@ -211,13 +221,36 @@ Hậu quả nếu không xử lý: ai đọc được repo đều có URL + toke
 
 ⚠ **Đừng viết `*` `/` `5` liền nhau trong comment khối** — nó đóng comment sớm. Đã dính một lần khi ghi "cron mỗi 5 phút".
 
+### 🔁 CHẤM SỔ DỰ PHÒNG — bot tự gọi `cham.php`, không chỉ dựa vào cron
+
+**Lỗ hổng đã vá (2026-08-10):** cron đỡ bot (cron bật lại bot nếu bot chết), nhưng **không ai đỡ cron**. Cron chết thì bot vẫn ghi kèo bình thường, trang xem vẫn xanh *"dữ liệu 1s trước"*, mà **không ai chấm** — mọi kèo kẹt `kq='mo'` vô thời hạn. Với một đợt treo hai tuần đó là hai tuần dữ liệu **không có nhãn nào**, mất trắng đúng mục đích thu thập, và **không backfill lại được** vì `/market/candles` của OKX chỉ giữ 1.440 nến 1m = 24 giờ.
+
+Ba đường cron chết mà server vẫn sống: (a) lệnh bắt đầu fail âm thầm — hosting nâng cấp PHP làm `php` rơi khỏi `PATH` hẹp của cron, kiểu **phổ biến nhất**; (b) crontab bị panel ghi lại hoặc xoá; (c) hosting siết tài nguyên / treo tài khoản. *(Server tắt thì ngược lại là trường hợp an toàn nhất: crontab nằm trên đĩa, server lên là cron chạy lại rồi bật lại bot trong 1 phút.)*
+
+`bot.js` nay tự gọi `cham.php` mỗi 60 giây (lượt đầu lùi 45 giây để lệch pha với cron ở giây `:00`). Bot là tiến trình chạy dài **độc lập với cron**, nên hai bên đỡ nhau chéo.
+
+**An toàn khi chạy song song, ba lớp:** `cham.php` mở đầu bằng `GET_LOCK('cham_keo', 0)` — timeout 0 nên gặp tiến trình khác đang chấm là in *"dang co tien trinh khac chay"* rồi thoát ngay; mọi `UPDATE` kèm `AND kq='mo'` rồi kiểm `rowCount`; và bot có cờ `dangCham` chống tự dồn lượt.
+
+Dùng header `X-Token` chứ không `?token=`: query string bị ghi vào access log của web server.
+
+**Ba trạng thái đọc được ở dòng sức khoẻ** `cham Nok/Mcron/Kloi`:
+
+| | Nghĩa |
+|---|---|
+| `ok` tăng | bot đang chấm (cron có thể đã chết — nhưng dữ liệu vẫn có nhãn) |
+| `cron` tăng | gặp khoá, tức **cron đang làm việc** — đây là dấu hiệu KHOẺ, không phải lỗi |
+| `loi` tăng | cả hai đường đang hỏng. `HTTP 401` = token lệch giữa `config.php` và `~/bot/token.txt` |
+
+**Trang xem cũng báo được** (quan trọng khi đi vắng — chỉ cần mở link, không cần SSH hay SQL): quá 10 phút không có lượt chấm thành công thì dòng chú thích đổi thành `⛔ CHẤM SỔ IM N PHÚT — kèo đang kẹt "mo", dữ liệu sẽ KHÔNG CÓ NHÃN`. Đã test cho kêu thật (4/4 mục, gồm cả trường hợp ảnh của bot bản cũ không có khối `cham` thì không được throw).
+
 ### Hai bên giám sát ĐỘC LẬP — phải xem cả hai
 
 ```bash
 tail -2 ~/bot/bot.log     # bên GHI: dòng cuối phải trong vòng 1 phút
 ```
 ```sql
-SELECT MAX(cham_luc), NOW() FROM keo;   -- bên CHẤM: lệch < 2 phút
+-- bên CHẤM: phải ra 0. ĐỪNG dùng MAX(cham_luc) — xem lý do ở mục cron phía trên.
+SELECT COUNT(*) FROM keo WHERE kq='mo' AND han_ms < (UNIX_TIMESTAMP()*1000 - 120000);
 ```
 
 Bot chết thì không có kèo mới. Cron chết thì kèo kẹt `mo`. Hai thứ chết độc lập nhau và **không thứ nào tự báo**.
@@ -761,6 +794,25 @@ Commit gần nhất trước khi có file này: `5d4e6f7` (máy quét OKX + lãi
 ⚠ **Đánh số mục phải liên tục và mới nhất ở TRÊN.** Đã có một lần hai phiên làm việc song song
 cùng đánh số `(13)` và mục mới bị chèn xuống giữa file — đọc từ trên xuống thành ra sai thứ tự
 thời gian. Trước khi thêm mục, kiểm số lớn nhất bằng `grep -n "^- \*\*2026-" CLAUDE.md | head -3`.
+
+- **2026-08-10 (26)** — **Vá lỗ hổng "không ai đỡ cron" — bot tự chấm sổ dự phòng.**
+  index.html 1903 → 1919 dòng, bot.js 270 → 346. Chi tiết ở mục "🔁 CHẤM SỔ DỰ PHÒNG".
+  **Bối cảnh:** chủ dự án sẽ treo hệ thống **2 tuần không ai xem**. Rà lại thì thấy cron đỡ bot
+  nhưng không ai đỡ cron — cron chết là 2 tuần dữ liệu **không có nhãn**, và không backfill được
+  vì OKX chỉ giữ 24 giờ nến 1m. Đây là lỗ hổng nghiêm trọng nhất còn lại, và chỉ lộ ra khi nghĩ
+  theo kịch bản vận hành dài hạn chứ không phải khi đọc code.
+  `bot.js` nay gọi `cham.php` mỗi 60 giây qua header `X-Token`, lệch pha 45 giây với cron. Ba lớp
+  chống chấm trùng: `GET_LOCK(...,0)` trong `cham.php`, `AND kq='mo'` + `rowCount`, và cờ
+  `dangCham` trong bot. Gặp khoá được tính là **dấu hiệu khoẻ** (cron đang làm việc) chứ không
+  phải lỗi — nếu tính là lỗi thì cảnh báo sẽ kêu oan mỗi phút.
+  **Đã test trên server thật:** `cham 2ok/0cron/0loi` sau 2 phút, stderr trống, RAM 86 MB.
+  Cộng 4 mục test cho cảnh báo mới: chấm bình thường / im 15 phút / lỗi 401 / ảnh bot bản cũ
+  không có khối `cham` (không được throw). Bộ test cũ vẫn 14/14 và 12/12.
+  **Cũng sửa một hướng dẫn SAI của chính tài liệu này:** `MAX(cham_luc)` so `NOW()` **không phải**
+  nhịp tim của cron — `cham_luc` chỉ ghi khi một kèo thật sự được chấm, mà kèo có hạn 1–4 giờ nên
+  nó cũ hàng giờ là bình thường. Dùng nó làm nhịp tim sẽ báo động giả, và báo oan vài lần là người
+  vận hành học cách phớt lờ đúng cảnh báo quan trọng. Câu đúng:
+  `SELECT COUNT(*) FROM keo WHERE kq='mo' AND han_ms < (UNIX_TIMESTAMP()*1000 - 120000)` → phải ra 0.
 
 - **2026-08-10 (25)** — **🚀 TRIỂN KHAI XONG. Bot chạy 24/24 trên server, máy tính tắt được.**
   Không đụng code — toàn bộ là việc triển khai và kiểm chứng. Chi tiết trạng thái ở mục
