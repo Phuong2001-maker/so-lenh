@@ -1,0 +1,14 @@
+# GHIM COIN — mỗi dòng một mã, KHÔNG kèm "-USDT-SWAP".
+#
+# Bot đọc lại file này mỗi 30 giây, không cần khởi động lại.
+# Coin đã ghim thì máy quét KHÔNG BAO GIỜ gỡ, dù nó nguội đi.
+#
+# Vì sao đặt bằng file mà không phải bấm trên trang: trang xem là CHỈ ĐỌC.
+# Cho bấm trên trang thì phải có endpoint điều khiển kèm xác thực, tức phải
+# nhét token vào một trang công khai — đúng thứ vừa bỏ đi được.
+#
+# Dòng bắt đầu bằng # là ghi chú. Xoá hết dòng là bỏ ghim toàn bộ.
+#
+# Ví dụ:
+# PEOPLE
+# BEAT

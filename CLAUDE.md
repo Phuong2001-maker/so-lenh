@@ -40,8 +40,228 @@ Mục đích: mở chat mới, AI đọc đúng file này là hiểu ngay dự �
 | VIEW `v_keo` + ENUM `khong_khop` | ✅ đã Import lại SQL, `bao-cao.php` từ 500 → **200** |
 | Cấp SSL | ✅ **xong** — ZeroSSL, "SSL Tự động" nên tự gia hạn. Đã kiểm TLS bắt tay + cả 4 endpoint qua HTTPS |
 | CORS từ `file://` | ✅ preflight OPTIONS trả **204** với `access-control-allow-origin: null` |
-| **Mở app kiểm dòng dữ liệu thật** | ⛔ **việc tiếp theo — chưa có dòng nào trong bảng `keo`** |
-| Cron `cham.php` | ⏳ chưa |
+| Đường ống ghi dữ liệu | ✅ **CHẠY THẬT** — xem phần kiểm chứng dưới |
+| Cron `cham.php` | ✅ **CHẠY THẬT** — xác nhận `MAX(cham_luc)` lệch `NOW()` chỉ **53 giây** |
+| **Bot 24/24 + trang xem chỉ-đọc** | ✅ **ĐANG CHẠY TRÊN SERVER** (2026-08-10 09:35) — xem dưới |
+
+### ✅ ĐANG CHẠY THẬT 24/24 — trạng thái lúc bàn giao
+
+Bot Node chạy nền trên hosting, **không cần máy nào bật**. Xác nhận từ ngoài internet:
+
+| | |
+|---|---|
+| Tuổi ảnh trạng thái | 1 giây (bot ghi đúng nhịp 2 giây) |
+| Coin / sàn | 8 coin · 30/32 sàn live |
+| Log | 6 gửi / **0 lỗi** / 0 mất / 0 thiếu nến |
+| Socket thanh lý | gói tin 5 giây trước, không lỗi |
+| Máy quét OKX | 35 giây trước, 0 lỗi |
+| RAM | ~117 MB |
+
+**Hai cron trên hosting** (1Panel → Tính năng nâng cao → Công việc Cron):
+
+| Lịch | Lệnh | Việc |
+|---|---|---|
+| `* * * * *` | `php /home/buwsofujhosting/domains/zewvir85.hiteckqualityconstruction.com.au/php/cham.php` | chấm kèo |
+| `* * * * *` | `cd /home/buwsofujhosting/bot && ./chay.sh > /dev/null 2>&1` | tự bật lại bot nếu chết |
+
+Cron chấm sổ dùng **PHP CLI** chứ không `curl`: không để token trong crontab, và không bị giới hạn thời gian chờ của web. `cham.php` tự bỏ qua kiểm token khi gọi bằng dòng lệnh (`CHAY_CLI`).
+
+Cron bot đặt **mỗi phút** thay vì mỗi 5 phút — cố ý giữ: `chay.sh` có `flock` + kiểm PID qua `/proc` nên khi bot đang chạy nó thoát ngay, chi phí gần bằng 0, mà bù lại bot chết thì được bật lại trong vòng 1 phút.
+
+**Ba đường dùng hằng ngày:**
+
+| Việc | Cách |
+|---|---|
+| Xem lệnh | `https://zewvir85.hiteckqualityconstruction.com.au/` |
+| Xem số | `https://zewvir85.hiteckqualityconstruction.com.au/php/bao-cao.php` |
+| Ghim coin | sửa `~/bot/ghim.txt`, bot đọc lại sau 30 giây, **không cần restart** |
+
+⚠ **`gui` đứng yên KHÔNG phải kẹt.** Mỗi coin chỉ được có một kèo mở tại một thời điểm, hạn 1–4 giờ → nhịp ra kèo ~20–40/ngày. Thấy `gui` không tăng trong một giờ là bình thường; thứ phải theo dõi là `loi` và `mat`.
+
+## 🎉 GIAI ĐOẠN 2 ĐÃ HOÀN TẤT (2026-08-10 01:12)
+
+Cả ba khâu chạy thật, đã kiểm chứng chứ không suy đoán: app ghi kèo (21 kèo), cron chấm mỗi phút, trang báo cáo đọc được. **Việc duy nhất chủ dự án phải làm từ giờ là để tab `index.html` mở.**
+
+Cron dùng `curl` chứ không `php` CLI — vì đường HTTP đã kiểm chứng chạy thật, còn PHP CLI trong cron thì chưa biết có sẵn không. Lệnh trong 1Panel → Tính năng nâng cao → Công việc Cron:
+
+```
+* * * * * curl -s -o /dev/null "https://zewvir85.hiteckqualityconstruction.com.au/php/cham.php?token=<API_TOKEN>"
+```
+
+⚠ Nếu về sau số kèo mở lên hàng trăm và lần chấm quá thời gian chờ của web, đổi sang PHP CLI — không giới hạn thời gian và không để token trong crontab:
+`php /home/buwsofujhosting/domains/zewvir85.hiteckqualityconstruction.com.au/php/cham.php`
+
+**Câu kiểm sức khoẻ cron** (chạy định kỳ, đây là lý do cột `cham_luc` tồn tại):
+
+```sql
+SELECT MAX(cham_luc) AS lan_cham_cuoi, NOW() AS gio_server FROM keo;
+```
+
+Lệch dưới 2 phút là khoẻ. Lệch hàng giờ = cron chết, mà **trang báo cáo vẫn trông bình thường** nên không có cách nào khác để phát hiện.
+
+### Mốc quay lại xem dữ liệu
+
+- **~100 kèo:** kiểm **lỗi thô** — % kèo có R:R < 1, % sinh khi máy nguội (`tuoi_may < 300`), tỷ lệ `khong_khop`. KHÔNG chỉnh trọng số.
+- **~800 kèo:** mới đủ để nói về tỷ lệ thắng ở mức tin cậy 95%.
+
+**✅ Đường ống đã chạy thật (2026-08-10, ~31 phút đầu):** 9 kèo trên 9 coin khác nhau (MMT, NEIRO, SHELL, PUMP, PEOPLE, ESP, BICO, BEAT, MUBARAK) — đúng luật "mỗi coin một kèo mở". Toàn bộ `kq='mo'` vì chưa có cron.
+
+**Bằng chứng bitmask `chan` ghi trung thực** — đối chiếu `chan` với `s` thì khớp hoàn toàn: 6 kèo `chan=0` đều có `|S|` ≥ 31; `PEOPLE chan=3` (1+2) với S=−16.09 đúng là `|S|<25`; `BICO chan=8` với S=−26.09 thì bit 1 **không** bật vì `|S|≥25`; `SHELL chan=9` (1+8) với S=20.00 đúng `|S|<25`. Sự khớp này quan trọng hơn việc có dòng dữ liệu — nó chứng minh nhóm đối chứng dùng được về sau.
+
+⚠ **n=9 và chưa kèo nào có kết quả — không đọc bất cứ điều gì từ đây.** Phân biệt 55% với 50% cần ~780 kèo độc lập.
+
+## 🏗 KIẾN TRÚC HIỆN TẠI — TÁCH GHI KHỎI XEM (2026-08-10)
+
+**Đây là mục quan trọng nhất của tài liệu. Đọc trước khi sửa bất cứ gì.**
+
+```
+Bot (Node, server, 24/24) ──ghi──> MySQL        ← tiến trình DUY NHẤT được ghi
+      │
+      └─ ghi đè mỗi 2 giây ──> trangthai.json
+                                     │
+                    Trang xem ←──đọc─┘          ← chỉ đọc, KHÔNG ghi gì
+```
+
+| Phần | Ở đâu | Việc |
+|---|---|---|
+| **Bot** | `~/bot/bot.js` (NGOÀI thư mục web) | giữ 40 WebSocket, phân tích, sinh kèo, ghi DB, ghi ảnh trạng thái |
+| **Ảnh trạng thái** | `<docroot>/trangthai.json`, ~16 KB | bot ghi đè mỗi 2 giây |
+| **Trang xem** | `https://zewvir85.hiteckqualityconstruction.com.au/` | tải ảnh mỗi 2 giây rồi vẽ |
+
+Triển khai: `bot/HUONG-DAN.md` (8 bước).
+
+### Cờ `LA_BOT` — một file, hai chế độ
+
+`index.html` chạy cả hai vai. Chế độ do **cờ `__BOT__`** quyết, và `bot.js` là thứ duy nhất đặt được cờ đó:
+
+- `LA_BOT = true` → chạy engine, `API_LOG` có URL, ghi DB, **không vẽ gì** (bỏ hẳn nhịp vẽ)
+- `LA_BOT = false` → **không** bật engine, `API_LOG = ''`, chỉ tải `trangthai.json` rồi vẽ
+
+**Trình duyệt KHÔNG BAO GIỜ vào được chế độ bot.** Đây là bảo đảm ở tầng thiết kế, không phải quy ước: mở link công khai bao nhiêu lần cũng không thể ghi một byte nào vào DB.
+
+⚠ **Giữ MỘT bản hàm vẽ.** `theCoin`/`renderLists`/`renderScan` dùng chung cho cả hai chế độ, và `anhTrangThai()`/`napTrangThai()` là cặp đối xứng nằm cạnh nhau. Tách thành hai bản vẽ là vài tuần sau sửa một bên quên bên kia, rồi trang hiển thị một thứ mà DB ghi thứ khác — không cách nào phát hiện.
+
+### `bot.js` NẠP `index.html` chứ không chép code
+
+`bot.js` đọc khối `<script>` của `index.html` rồi chạy bằng indirect eval. Nên chỉ tồn tại **một** bản thuật toán. Chép sang thành bản thứ hai là: sửa một bên quên bên kia, số bot ghi lệch số trang hiện, và dữ liệu trước/sau lần chép không so sánh được.
+
+Chi phí gần bằng 0 vì cả 1500 dòng chỉ chạm DOM đúng **10 chỗ** (4 `innerHTML`, 3 `textContent`, `document.title`, `getElementById`, `querySelectorAll`) — bản giả lập DOM trong `bot.js` chỉ vài dòng, mà bot còn không vẽ nên gần như không gọi tới.
+
+⚠ **Dùng eval chứ KHÔNG dùng module `vm`.** `vm.createContext` tạo realm khác, làm mọi `instanceof` / `Array.isArray` xuyên realm sai **âm thầm** — đúng loại lỗi tệ nhất cho tiến trình chạy nền không ai xem.
+
+⚠ **`index.html` phải giữ dòng cuối** `if (LA_BOT) globalThis.__botAPI = {...}`. Xoá là bot thoát ngay với thông báo rõ ràng, nhưng đừng để mất.
+
+### Ba hạn chế đã XOÁ được nhờ kiến trúc này
+
+1. ~~Phải treo máy~~ → bot chạy trên server, máy tắt thoải mái.
+2. ~~Kèo chồng nhau khi khởi động lại~~ → chỉ một tiến trình ghi, và nó không khởi động lại khi có người mở trang.
+3. ~~`wallBook` mất mỗi lần F5~~ → tường tích luỹ liên tục nhiều ngày. Đây là lợi ích lớn nhất về **chất lượng dữ liệu**: độ tin tường sẽ cao hơn hẳn, mà `tuoi_may` là biến có sức giải thích cao nhất theo chính tài liệu này.
+
+Thêm nữa: bot chạy sẵn nên mở trang là **thấy lệnh ngay**, không còn chờ 90 giây ấm máy.
+
+### Hạn chế MỚI sinh ra — đã biết và chấp nhận
+
+- **Trang xem công khai.** Ai có link đều xem được. Chưa đặt mật khẩu theo yêu cầu chủ dự án.
+- **Không bấm ghim trên trang được nữa.** Ghim đặt bằng `~/bot/ghim.txt`, bot đọc lại mỗi 30 giây. Khối xử lý click đã **xoá** — giữ lại là một nút nhìn như bấm được mà thật ra bị ghi đè sau 2 giây, tệ hơn không có nút. Muốn nút trở lại thì cần endpoint điều khiển có xác thực, tức phải nhét token vào trang công khai — đúng thứ vừa bỏ được.
+- **`file://` không dùng được nữa.** Mở `index.html` từ máy sẽ báo `⛔ CHƯA TẢI ĐƯỢC trangthai.json` vì trình duyệt chặn `fetch` giữa hai file cục bộ. Dùng link.
+- **Bot chết là hỏng IM LẶNG.** Trang vẫn vẽ mấy thẻ cũ, người xem tưởng thị trường yên. Nên trang **luôn hiện tuổi của ảnh**, và quá 30 giây thì thay dòng chú thích bằng cảnh báo đỏ. Kèm cron `*/5` tự bật lại bot.
+
+### 🔐 SỰ CỐ TOKEN BỊ LỘ (2026-08-10) — đã xử lý, đọc để không lặp lại
+
+Quét từng commit trong lịch sử git: **mật khẩu DB KHÔNG bị lộ** (`php/config.php` được untrack trước khi điền). Nhưng **`API_TOKEN` cũ (`36crT…`) VÀ URL endpoint `ghi.php` nằm trong `index.html` ở 3 commit `e95e67e` / `2a50184` / `6be817b`, mà `origin/main` = `6be817b` — tức ĐÃ push lên `github.com/Phuong2001-maker/so-lenh`.**
+
+Cách nó xảy ra: một phiên làm việc **song song** commit `index.html` khi token còn nằm trong file. Thay đổi đưa token ra khỏi `index.html` diễn ra SAU đó. Không ai làm gì sai một cách rõ ràng — chỉ là hai việc đúng làm sai thứ tự.
+
+Hậu quả nếu không xử lý: ai đọc được repo đều có URL + token, tức **POST được kèo bịa vào bảng `keo`** — làm bẩn mẫu theo cách không phát hiện được sau này, đúng thứ dự án này không chịu nổi.
+
+**Đã xử lý:** đổi token mới, chỉ nằm trong `php/config.php` (đã `.gitignore`). Token cũ thành vô giá trị nên **không cần viết lại lịch sử git**. Kiểm lại: không file nào trong repo còn chứa token cũ, và `index.html` không còn chứa token nào.
+
+⚠ **Ba quy tắc rút ra:**
+1. **Đừng bao giờ dán token thật vào file được commit** — kể cả file hướng dẫn (`bot/HUONG-DAN.md` từng có nó trong lệnh `echo … > token.txt`, đã thay bằng chỗ trống).
+2. **Trước khi commit, quét bí mật:** `grep -rln '<token>' . --exclude-dir=.git`
+3. **CLAUDE.md đã push có tên DB + tên user** (`buwsofujhosting_coin_db` / `…_coin_user`). Không phải mật khẩu, và MySQL chỉ nghe localhost, nên rủi ro thấp — nhưng nếu repo đang public thì nên chuyển sang **private**, vì đó là thông tin trinh sát miễn phí.
+
+### Bộ lưới an toàn chống hỏng IM LẶNG — đừng gỡ cái nào
+
+Đợt rà soát 70 agent (2026-08-10) tìm ra **24 lỗi thật**, phần lớn cùng một họ: hệ thống *chạy tiếp nhưng sai âm thầm*. Mỗi lưới dưới đây sinh ra từ một lỗi cụ thể, và **đã test cho kêu thật** (11/11 mục):
+
+| Lưới | Chống điều gì |
+|---|---|
+| `lastData` tách khỏi `lastMsg` | socket còn trả `pong` nhưng kênh books đã im → sổ ĐÓNG BĂNG mà nhãn vẫn `live`, rồi `wallTrust` càng cộng điểm vì tường "sống lâu" → bot sinh kèo từ sổ hàng giờ trước |
+| Canh chừng **nối lại thật**, không chỉ đổi nhãn | socket nửa-mở không sinh `onclose` → nằm `wait` vô thời hạn |
+| Thử lại state `off` mỗi 5 phút | mất OKX = mất `bidsOkx` = `bestWall` null = coin đó **không bao giờ sinh kèo nữa**, mà `pred.ready` vẫn true và 3 sàn kia vẫn `live`. Coin GHIM không có đường tự hồi phục |
+| Cắt `flowSec`/`liqs` **tại chỗ nạp** | hai mảng này chỉ được cắt trong `flowStats`/`liqStats`, mà hai hàm đó không chạy khi `aggregate()` trả null → tăng vô hạn. Đây là đường rò rỉ bộ nhớ thật sự duy nhất |
+| `scan.lucQuet`/`loi` + cảnh báo `!!` | `pollScan` từng `catch(e){}` rỗng → bot sống, ảnh vẫn ghi, mà **0 coin được theo dõi vĩnh viễn**, dòng log trông y như bình thường |
+| Đếm `thieuNen` | thiếu nến 48h thì `sinhKeo` bỏ mọi kèo trong khi MỌI chỉ báo đều xanh và trang vẫn vẽ đủ thẻ — DB không nhận một dòng nào |
+| `logStat.mat` + trần 500 | trần 40 cũ ném kèo **chưa gửi** mà không đếm; token lệch một lần là mất 100% kèo mới trong khi bot vẫn chạy |
+| Đo độ trễ bằng **một đồng hồ** | bản đầu trừ đồng hồ trình duyệt cho đồng hồ server → điện thoại lệch NTP là cảnh báo bot-chết im vĩnh viễn (hoặc kêu oan vĩnh viễn, rồi người xem học cách phớt lờ) |
+| So `ver` bot ↔ trang | sửa thuật toán mà quên restart bot → bot ghi DB bằng bản CŨ với cột `ver` cũ, trang vẽ theo bản mới. **Không có cách nào khác phát hiện** |
+| `veChuThich()` gọi TRƯỚC khi vẽ thẻ | dòng chẩn đoán từng nằm ở cuối `renderLists` → một ngoại lệ khi dựng thẻ là bịt miệng đúng cái lưới an toàn |
+| `render()` bọc try + hiện lỗi ra màn hình | `render()` từng nằm ngoài try → trang đóng băng, lỗi chỉ trong Console mà người xem điện thoại không mở |
+| Bỏ ảnh không mới hơn | mạng tắc → phản hồi về sai thứ tự → ảnh CŨ ghi đè ảnh MỚI, thẻ nhảy lùi và độ trễ nhảy loạn |
+| `AbortController` 1500ms | không có trần thì fetch dồn thành đống (trình duyệt chỉ cho 6 kết nối/host) |
+| `napTrangThai` đọc phòng vệ, parse xong mới chạm `engines` | ảnh thiếu khối là ném lỗi giữa đường, để lại `engines` xoá nửa vời và cảnh báo báo SAI nguyên nhân |
+| Xoay `bot.log` 20 MB + gom lỗi trùng | một lỗi lặp nhịp 2 giây = ~43.000 stack/ngày → đầy quota → `trangthai.json` ghi lỗi, MySQL ngừng ghi. Một lỗi lẻ hạ cả hệ thống |
+| Thoát khi >20 ngoại lệ/60 giây | chạy tiếp với trạng thái hỏng tệ hơn chết CÓ dấu hiệu; cron bật lại sạch |
+| `flock` + `bot.pid` xác minh qua `/proc` | `pgrep -f bot.js` bắt cả `vi bot.js` → báo "đang chạy" trong khi bot chết từ lâu, và cron lần nào cũng báo thành công |
+| Canh chừng socket **thanh lý** (`lqLastMsg`) + bắt `event:error` | nguồn duy nhất của `sLiq` (**trọng số 0.20**, nặng thứ hai) và nằm NGOÀI mọi engine. Đăng ký bị sàn từ chối thì socket vẫn mở, ping vẫn chạy, mà không bao giờ có dữ liệu → mọi kèo về sau có `sig_lq = NULL`, và vài tuần sau không phân biệt được "không có thanh lý" với "feed đã chết". Ở đây dùng `pong` làm dấu hiệu sống là ĐÚNG (khác các sàn khác) vì thanh lý là sự kiện thưa |
+| Canh chừng **ws2 của Binance** (`lastData2`) + `tWs2` một biến | ws2 (aggTrade/forceOrder) sống riêng với socket sổ lệnh nên chết nửa-mở mà depth vẫn `live` → mất nguồn Binance cho `sFlow30` (0.30) + `sFlow5` (0.15) = **45% tổng trọng số**, điểm S lệch hệ thống mà không chỉ số nào nói. Và timer nối lại từng `push` vào `c.timers` — mảng đó chỉ được dọn bởi `clearConn`, mà đường nối lại của ws2 không gọi `clearConn` → mảng lớn dần theo tuần |
+
+⚠ **Bài học kiến trúc quan trọng nhất:** `moSocketThanhLy()` bị bỏ sót cổng `LA_BOT` đúng vì nó là socket **dùng chung toàn sàn**, nằm NGOÀI vòng đời engine. **Mọi thứ đặt ở cấp cao nhất, ngoài `batDauEngine`, phải tự kiểm `LA_BOT`.**
+
+⚠ **Đừng viết `*` `/` `5` liền nhau trong comment khối** — nó đóng comment sớm. Đã dính một lần khi ghi "cron mỗi 5 phút".
+
+### Hai bên giám sát ĐỘC LẬP — phải xem cả hai
+
+```bash
+tail -2 ~/bot/bot.log     # bên GHI: dòng cuối phải trong vòng 1 phút
+```
+```sql
+SELECT MAX(cham_luc), NOW() FROM keo;   -- bên CHẤM: lệch < 2 phút
+```
+
+Bot chết thì không có kèo mới. Cron chết thì kèo kẹt `mo`. Hai thứ chết độc lập nhau và **không thứ nào tự báo**.
+
+---
+
+### CORS — bẫy so khớp Origin CHÍNH XÁC TỪNG KÝ TỰ
+
+`config.php` so Origin bằng `in_array(..., true)`. Danh sách cho phép `['null', 'http://localhost', 'http://127.0.0.1']` **không kèm cổng**, nên thêm `:5500` là thành chuỗi khác. Đã test thật:
+
+| Origin | CORS |
+|---|---|
+| `null` (`file://`) · `http://127.0.0.1` | ✅ cho phép |
+| `http://127.0.0.1:5500` · `http://localhost:5500` (Live Server) | ⛔ **BỊ CHẶN** |
+
+Đã dính một lần: mở app bằng Live Server thì `log: 0 gửi` mãi mà **không có thông báo lỗi nào trên giao diện** — trình duyệt chặn ở tầng CORS, app chỉ thấy fetch thất bại.
+
+⚠ **Từ kiến trúc bot (2026-08-10) chuyện này gần như không còn liên quan:** bot gọi `ghi.php` bằng Node nên **không có CORS** (CORS là cơ chế của trình duyệt), còn trang xem chỉ đọc `trangthai.json` **cùng tên miền**. Giữ mục này lại vì nếu sau này thêm endpoint nào cho trình duyệt gọi chéo tên miền thì lại dính đúng bẫy đó.
+
+### Lịch sử: ba cách chạy đã thử rồi bỏ
+
+Ghi lại để không ai đi lại đường cũ:
+
+| Cách | Vì sao bỏ |
+|---|---|
+| Mở tab `file://` bằng tay | đóng tab là ngừng ghi; `wallBook` mất mỗi lần F5 |
+| Chrome `--headless=new` + `.bat` | chạy được thật (7–8 tiến trình, ~486 MB, kèo tăng 10→11 trong 5 phút) nhưng vẫn phải bật máy 24/7, và tốn 8× RAM so với Node |
+| Cron hút REST mỗi phút thay WebSocket | độ phân giải tụt 2 giây → 60 giây, phá đúng phần chống lệnh ảo — thứ đáng giá nhất của app |
+
+⚠ **Nếu vì lý do gì phải quay lại chạy app trong tab trình duyệt nền, BỐN cờ này là bắt buộc:** `--disable-background-timer-throttling`, `--disable-renderer-backgrounding`, `--disable-backgrounding-occluded-windows`, `--disable-features=CalculateNativeWinOcclusion`. Chrome hạ nhịp `setInterval` xuống 1 lần/phút cho tab nền; vòng phân tích là 2 giây nên app **vẫn chạy nhưng sinh kèo từ dữ liệu cũ cả phút** mà không báo lỗi gì — hỏng im lặng, không phát hiện được từ dữ liệu.
+
+### ✅ ĐÃ SỬA: kèo chồng nhau khi khởi động lại
+
+*(Trước 2026-08-10)* Danh sách "kèo đang mở" chỉ nằm trong RAM client, không đọc từ server, nên mỗi lần tắt/bật lại app là nó quên hết rồi sinh kèo mới cho coin **đang có kèo mở** — hai kèo chồng thời gian trên cùng một coin thì **không độc lập**, phá đúng giả định mà mọi phép đo tỷ lệ thắng dựa vào.
+
+Kiến trúc bot xoá gốc rễ vấn đề: chỉ còn **một** tiến trình ghi, và nó **không** khởi động lại khi có người mở trang xem.
+
+Vẫn nên kiểm định kỳ, vì mỗi lần khởi động lại bot (sửa thuật toán, cron bật lại sau khi bot chết) lại tạo ra đúng tình huống cũ:
+
+```sql
+SELECT coin, COUNT(*) n FROM keo WHERE kq='mo' GROUP BY coin HAVING n > 1;
+```
+
+Có dòng thì **đừng xoá** — lọc bằng SQL lúc phân tích. Cách sửa gốc còn lại: `sinhKeo` hỏi server danh sách kèo đang mở lúc khởi động (**chưa làm**).
 
 **Đã kiểm bằng `curl` thật qua HTTP (không suy đoán), chỉ có 4 file PHP + `.htaccess` trong `/domains/zewvir85.hiteckqualityconstruction.com.au/php/`:**
 
@@ -433,6 +653,29 @@ Kết quả một đợt phân tích 5 góc nhìn chuyên môn + 3 vòng phản 
 
 **Cắt hẳn khỏi giai đoạn 2:** toàn bộ tầng bot (chưa có bot, chưa có API key — nối vào sau qua `uid`, chi phí tương thích ngược bằng 0); bảng ghi trạng thái mỗi 30 giây (1 triệu dòng/năm cho một nhóm đối chứng mà kèo bóng cho rẻ hơn 50 lần); mọi cột dẫn xuất kiểu `r_realized` (đặt tên đó cho một sổ giấy có phí là hằng số giả định thì vài tháng sau chính mình sẽ đọc nó như tiền thật).
 
+### 📊 LÔ DỮ LIỆU ĐẦU TIÊN (84 kèo, 8,5 giờ) — số đã xoá, GIỮ LẠI 4 GIẢ THUYẾT
+
+App cũ (kiến trúc trong-trình-duyệt) chạy liên tục 2026-08-09 23:58 → 08:35 và ghi **84 kèo**, trong đó **26 kèo thật đã phân định**. Bảng `keo` đã `TRUNCATE` để bắt đầu sạch với kiến trúc bot. Ghi lại các con số ở đây vì **chúng là dữ liệu thật đầu tiên** và đáng dùng làm giả thuyết đối chiếu.
+
+**Nhóm thật (n=26):** thắng 26,9% · baseline 38,1% · **hơn ngẫu nhiên −11,2%** · Wilson 95% **13,7–46,1%** · Tổng R sau phí **−9,95 R** (KV/kèo −0,343 R) · R:R TB 2,06 · spread 4,8 bp.
+
+⛔ **KHÔNG kết luận được gì từ lô này, vì hai lý do độc lập:**
+1. **Độ nhạy quy ước chấm THẤT BẠI:** chạm 26,9% vs đóng nến 38,5% → **chênh 11,5 điểm**, gấp đôi ngưỡng 5 điểm mà chính tài liệu này đặt ra. Nghĩa là kết luận phụ thuộc quy ước chấm chứ không phụ thuộc máy.
+2. Wilson 13,7–46,1% **có chứa** baseline 38,1%.
+
+**Bốn giả thuyết cần kiểm lại ở n ≈ 100 — đây là giá trị thật của lô này:**
+
+| Giả thuyết | Số lô đầu | Ghi chú |
+|---|---|---|
+| **Máy nguội tệ hơn máy ấm** | nguội (<5') −15,5% (n=17) · ấm −3,1% (n=9) | **Khớp đúng dự đoán của tài liệu** về "kèo mù". Ứng viên số 1 để thêm chốt: không phát kèo trong 5 phút đầu mỗi coin |
+| **21% lệnh chờ KHÔNG khớp** | 7/33 kèo thật | Tường vào đặt quá xa giá. Lỗi **cấu trúc**, ít phụ thuộc nhiễm bẩn nhất → đáng tin nhất trong bốn cái |
+| **Nhóm BỊ CHẶN thắng hơn nhóm thật** | +4,6% (n=27) vs −11,2% (n=26) | 4 chốt chặn có thể đang **cắt mất kèo thắng** — đúng câu hỏi mà cột `chan` sinh ra để trả lời |
+| **Tường tin cao KHÔNG tốt hơn** | tin ≥55 −12,9% (n=10) · tin 35–54 −10,2% (n=16) | Công thức `+15/+8/−30` có thể chỉ là trang trí |
+
+Hai chỗ **ngược trực giác**, chưa đủ mẫu nhưng phải theo dõi: `|S|` 40–59 (−26,8%, n=9) **tệ hơn** `|S|` 25–39 (−3,0%, n=17); và tường có **nhiều** tiền OKX hơn lại thua nhiều hơn (OKX ≥70%: −29,7%, n=8) — cái sau thách thức chính giả định nền của lần đổi sang sổ riêng OKX.
+
+⚠ **Đừng chỉnh trọng số vì bảng này.** Mọi ô đều n < 20. Đúng vòng lặp "chỉnh sớm sau vài chục kèo" đã đẻ ra 4 chốt chặn hiện tại — mà chính chúng giờ đang bị nghi là cắt mất kèo thắng.
+
 ### Nguyên tắc đo lường — đọc trước khi báo cáo bất kỳ con số nào
 
 - **Tỷ lệ thắng trần trụi là con số dối nhất trong hệ thống này.** TP và SL đều là *tường*, khoảng cách bất đối xứng và đổi theo từng kèo. Thắng 65% ở RR 0.6 là cháy tài khoản; thắng 45% ở RR 2.5 là in tiền.
@@ -518,6 +761,150 @@ Commit gần nhất trước khi có file này: `5d4e6f7` (máy quét OKX + lãi
 ⚠ **Đánh số mục phải liên tục và mới nhất ở TRÊN.** Đã có một lần hai phiên làm việc song song
 cùng đánh số `(13)` và mục mới bị chèn xuống giữa file — đọc từ trên xuống thành ra sai thứ tự
 thời gian. Trước khi thêm mục, kiểm số lớn nhất bằng `grep -n "^- \*\*2026-" CLAUDE.md | head -3`.
+
+- **2026-08-10 (25)** — **🚀 TRIỂN KHAI XONG. Bot chạy 24/24 trên server, máy tính tắt được.**
+  Không đụng code — toàn bộ là việc triển khai và kiểm chứng. Chi tiết trạng thái ở mục
+  "✅ ĐANG CHẠY THẬT 24/24".
+  Thứ tự đã làm: đổi token trên server → tải `index.html` mới (bản không còn token) → tạo
+  `~/bot/` **ngoài** thư mục web → `token.txt` (tạo qua File Manager chứ không Terminal, để token
+  không vào `.bash_history`) → `chmod +x` → chạy thử `KHONG_GHI=1` → chạy thật → 2 cron.
+  **Xác nhận token cũ đã chết:** POST bằng token cũ trả **401 "token sai"**, token mới trả **200**.
+  **Xác nhận trang công khai không còn token:** đã grep bản trên server, `API_TOKEN` giờ là
+  `(typeof __API_TOKEN__ ...) : ''`.
+  **Đã `TRUNCATE keo`** theo yêu cầu chủ dự án, bỏ 84 kèo của kiến trúc cũ. Bốn giả thuyết rút ra
+  từ lô đó đã ghi vào mục "📊 LÔ DỮ LIỆU ĐẦU TIÊN" — xoá dòng chứ không xoá kiến thức. Giữ `phi`.
+  **Bắt được một lỗi âm thầm khi soi trang Cron:** cron `cham.php` cũ vẫn dùng **token đã lộ**,
+  tức bộ chấm sổ đã chết từ lúc đổi token mà không dấu hiệu gì — kèo sẽ kẹt `mo` vĩnh viễn. Đã
+  thay bằng PHP CLI. Đây đúng loại hỏng mà cột `cham_luc` tồn tại để phát hiện.
+  **Đã dọn:** `test-song.log` (tiến trình nhân chứng sống **gần 8 tiếng** — bằng chứng mạnh nhất
+  về việc hosting giữ được tiến trình chạy dài) và file nén Node 44,9 MB.
+
+- **2026-08-10 (24)** — **Vá 2 phát hiện còn sót của đợt rà soát — nay đã đóng đủ 24/24.**
+  1832 → 1903 dòng index.html, bot.js 258 → 270. Cả hai đều làm **bẩn tín hiệu** chứ không làm
+  sập gì, nên chúng thuộc loại tệ nhất: chạy tiếp mà số sai.
+  (a) **Socket thanh lý** không có canh chừng và **nuốt luôn phản hồi lỗi của sàn**. Đây là nguồn
+  duy nhất của `sLiq` (trọng số 0.20) và nằm ngoài mọi engine nên không bộ canh chừng theo-sàn
+  nào che. Đăng ký bị từ chối thì socket vẫn mở, ping vẫn chạy, mà không bao giờ có dữ liệu →
+  `sig_lq` toàn NULL. Thêm `lqLastMsg`/`lqLastData`/`lqLoiCuoi`, bắt `d.event === 'error'`, đóng
+  socket khi im quá 60 giây để `onclose` tự nối lại, và đưa cả ba vào ảnh trạng thái + dòng sức
+  khoẻ. Ở socket này dùng `pong` làm dấu hiệu sống là **đúng** (khác hẳn 4 sàn kia) vì thanh lý là
+  sự kiện thưa — im hàng giờ là bình thường.
+  (b) **ws2 của Binance** (aggTrade/forceOrder) sống riêng với socket sổ lệnh: chết nửa-mở thì
+  depth vẫn `live` trong khi mất nguồn Binance cho `sFlow30` + `sFlow5` = **45% tổng trọng số**.
+  Thêm `c.lastData2` + canh chừng 180 giây (coin nào cũng phải có khớp lệnh trong 3 phút ở mức
+  thanh khoản >200k USD/24h) và `c.moLaiWs2` để mở lại. Đổi timer nối lại từ `c.timers.push(...)`
+  sang **một biến `c.tWs2`** có `clearTimeout` — mảng `c.timers` chỉ được dọn bởi `clearConn` mà
+  đường nối lại của ws2 không gọi `clearConn`, nên mảng lớn dần theo tuần. `clearConn` nay dọn
+  `tWs2` bằng tay, vì nó nằm ngoài mảng.
+  **Kiểm lại toàn bộ:** thẻ coin 14/14, lưới an toàn 12/12, bot chạy 75 giây với **32/32 sàn
+  live**, không dòng `!! CANH BAO` nào, ảnh 19,2 KB. Xác nhận khối `lq` trong ảnh có số thật
+  (`lastData` 11 giây trước) — tức thanh lý đang chảy và giám sát được.
+
+- **2026-08-10 (23)** — **Rà soát bảo mật lịch sử git → ĐỔI TOKEN.** Chi tiết ở mục
+  "🔐 SỰ CỐ TOKEN BỊ LỘ". Quét từng commit: mật khẩu DB **không** lộ; nhưng `API_TOKEN` cũ và URL
+  `ghi.php` nằm trong `index.html` ở 3 commit **đã push** lên GitHub. Đã đổi token mới (chỉ nằm
+  trong `php/config.php`, đã gitignore), và bỏ token thật khỏi `bot/HUONG-DAN.md`.
+  Cũng rải phần mở socket theo nhịp 400ms trong `batDauEngine`: trước đây 32 cú bắt tay WebSocket
+  nổ cùng lúc lúc khởi động nguội, đủ để OKX chặn nhịp — mà một lần bị chặn là sàn đó rơi 'off'
+  và coin đó không sinh được kèo nào. Và bỏ một lệnh gọi `anhTrangThai()` thừa trong `inSucKhoe`.
+
+- **2026-08-10 (22)** — **Rà soát đối kháng 70 agent rồi vá 17 lỗi.** 1630 → 1832 dòng index.html,
+  bot.js 190 → 258. Bảng đầy đủ ở mục "Bộ lưới an toàn chống hỏng IM LẶNG".
+  Rà 4 chiều (chạy dài hạn · JSON méo · độ khớp ảnh trạng thái · gating chế độ), mỗi phát hiện
+  bị **2 agent độc lập cố bác bỏ**: 33 phát hiện → **24 sống sót**, 9 bị bác bỏ.
+  **Lỗi tôi vừa tạo ra, tệ nhất:** `moSocketThanhLy()` gọi ở cấp cao nhất mà **quên bọc `LA_BOT`**
+  → trang xem cũng mở WebSocket OKX rồi ném TypeError mỗi gói tin, vì engine do `napTrangThai()`
+  dựng không có `liqs`. Phá đúng bảo đảm vừa viết vào tài liệu. Hai chiều rà soát độc lập cùng
+  báo, 2/2 cả hai. Nguyên nhân gốc: socket đó **dùng chung toàn sàn** nên nằm ngoài
+  `batDauEngine` — đã ghi thành nguyên tắc.
+  **Ba lỗi làm BẨN DỮ LIỆU (có sẵn từ trước, nhưng bot chạy nhiều ngày mới thành nghiêm trọng):**
+  (a) `pong` cũng làm mới `lastMsg` → socket nửa-mở giữ nhãn `live` với sổ ĐÓNG BĂNG, rồi
+  `wallTrust` càng cộng điểm cho tường chết vì nó "sống lâu" → sinh kèo từ sổ hàng giờ trước;
+  (b) state `off` là ngõ cụt vĩnh viễn → mất OKX là coin đó không bao giờ sinh kèo nữa mà mọi
+  chỉ báo vẫn xanh; (c) `flowSec`/`liqs` chỉ được cắt trong hàm không chạy khi mất sàn → rò rỉ
+  bộ nhớ thật.
+  **Hai lỗi làm chính lưới an toàn vô hiệu:** đo độ trễ bằng hai đồng hồ khác nhau (lệch NTP là
+  cảnh báo im hoặc kêu oan vĩnh viễn), và `render()` nằm ngoài `try` nên trang đóng băng im lặng.
+  **Đã test cho các lưới KÊU THẬT, 11/11 mục:** ảnh sai cấu trúc / rỗng / null / `coins` không
+  phải mảng đều ra cảnh báo mà không throw; `ver` lệch ra "BOT ĐANG CHẠY BẢN CŨ"; ảnh cũ bị bỏ
+  qua; quá 30 giây ra "DỮ LIỆU CŨ". Cộng test thẻ coin **14/14** phần vẫn nguyên sau khi vá.
+  **9 phát hiện bị bác bỏ** — ghi lại để không ai vá thứ không hỏng: vòng phân tích không cần
+  try/catch từng coin, `wallBook` đã có dọn 24h, `napGhim` không thực sự kẹt, `keoCua`/`theCoin`
+  không throw với ảnh hợp lệ.
+  Bắt được một lỗi cú pháp nhờ chính `node --check`: viết `*` `/` `5` trong comment khối làm
+  comment đóng sớm.
+
+- **2026-08-10 (21)** — **🏗 TÁCH GHI KHỎI XEM — bot Node 24/24 + trang xem chỉ-đọc.**
+  1493 → 1630 dòng index.html, thêm thư mục `bot/` (`bot.js` 190 dòng, `chay.sh`, `dung.sh`,
+  `ghim.txt`, `HUONG-DAN.md`). Chi tiết kiến trúc ở mục "🏗 KIẾN TRÚC HIỆN TẠI" đầu file.
+  **Yêu cầu gốc:** ghi 24/24 không cần treo máy; mở link để xem thì CHỈ xem, không ghi đè DB;
+  và mở ra là thấy lệnh ngay chứ không phải chờ ấm máy. Cả ba đã đạt.
+  **Thuật toán KHÔNG đổi một dòng** — `taoEngine`/`aggregate`/`updateWalls`/`wallTrust`/`analyze`/
+  `bestWall`/`pickLevels`/`keoCua`/`sinhKeo` nguyên vẹn, nên dữ liệu bot sinh ra so sánh được với
+  21 kèo đã có, không tạo đứt đoạn trong bảng.
+  **Quyết định kiến trúc đáng ghi:** `bot.js` **NẠP** khối `<script>` của `index.html` rồi chạy
+  bằng indirect eval, chứ KHÔNG chép code sang — chỉ tồn tại một bản thuật toán. Rẻ vì cả file
+  chỉ chạm DOM 10 chỗ. Dùng eval chứ không `vm` vì `vm` tạo realm khác làm `instanceof` xuyên
+  realm sai **âm thầm**.
+  **Bảo đảm ở tầng thiết kế:** trình duyệt không bao giờ đặt được cờ `__BOT__`, nên trang công
+  khai **không thể** ghi DB. Kèm theo: `API_TOKEN` đã **ra khỏi** `index.html` (bot đọc
+  `~/bot/token.txt` ngoài thư mục web) — trước đây để token trong file mà file đó lại đặt công
+  khai thì ai xem mã nguồn cũng đọc được.
+  **Xoá ba hạn chế cũ:** phải treo máy · kèo chồng nhau khi khởi động lại · `wallBook` mất mỗi F5
+  (cái thứ ba là lợi ích lớn nhất về chất lượng dữ liệu — tường tích luỹ nhiều ngày).
+  **Đã xoá code thành thừa:** khối `onclick` ghim trong `renderScan` (26 dòng) cùng `data-s`,
+  `cursor:pointer` và `:hover` của `.scanRow`. `renderScan` nay chỉ chạy ở chế độ xem, mà chế độ
+  xem không sở hữu tập engine nên bấm vào chỉ sửa bản sao trong RAM rồi bị ghi đè sau 2 giây —
+  một nút nhìn như bấm được mà không ăn còn tệ hơn không có nút. Ghim chuyển sang `~/bot/ghim.txt`.
+  Rà cả file: **không có hàm nào định nghĩa rồi bỏ đó**, `#scanBody` thì CSS dùng làm lưới.
+  **Tối ưu:** bot bỏ hẳn nhịp vẽ; trang xem vẽ 2 giây/lần thay vì 1 giây (dữ liệu chỉ mới mỗi
+  2 giây nên vẽ dày hơn là vẽ lại đúng thứ cũ); ảnh trạng thái chỉ ~**16 KB** vì chỉ gửi 2 bản
+  ghi tường mà `wallInfo()` cần thay vì cả `wallBook` vài trăm bản ghi.
+  **Thêm hai lưới an toàn** cho kiểu hỏng im lặng: trang xem **luôn hiện tuổi của ảnh** và quá
+  30 giây thì thay dòng chú thích bằng cảnh báo đỏ; ghi ảnh qua file tạm rồi `rename` (nguyên tử)
+  để trang xem không đọc phải JSON viết dở. Cộng cờ `KHONG_GHI=1` để chạy thử mà chưa ghi DB.
+  **Đã test đầu-cuối trên máy, không phải suy đoán:** bot nạp 67 KB script, 8 coin, 32/32 sàn
+  live, ảnh 16,5 KB; chạy `renderLists()` thật trong Node và trong Chrome thật qua HTTP — thẻ coin
+  dựng đủ **14/14** phần (đầu thẻ, S, thanh tin cậy, VÀO/CHỐT/CẮT, R:R, baseline, trần/sàn, dòng
+  căn cứ, bản đồ mốc, độ tin tường, `wallInfo`, nhãn xác nhận sàn) với dữ liệu thật của BEAT và
+  PEOPLE. Xác nhận `LA_BOT=false` thì `API_LOG` và `API_TOKEN` đều là chuỗi rỗng.
+  **Chưa làm:** mật khẩu HTTP cho trang xem (chủ dự án nói chưa cần).
+
+- **2026-08-10 (20)** — **🎉 GIAI ĐOẠN 2 HOÀN TẤT.** Không đụng code app — chỉ cài cron và kiểm chứng.
+  Cron trong 1Panel → **Tính năng nâng cao → Công việc Cron** (không nằm ngoài sidebar, mất thời
+  gian mới tìm ra). Panel này là **crontab chạy lệnh shell**, KHÔNG có kiểu "truy cập URL" —
+  dùng `curl -s -o /dev/null "<url>?token=..."` với lịch `* * * * *`. Chọn `curl` chứ không PHP CLI
+  vì đường HTTP đã kiểm chứng chạy thật, còn PHP CLI trong cron thì chưa biết có sẵn không.
+  **Xác nhận cron chạy thật:** `MAX(cham_luc)` = 01:12:05 so với `NOW()` = 01:12:58 → lệch **53
+  giây**. Đây đúng là công dụng của cột `cham_luc`.
+  **Rủi ro hạ tầng lớn nhất đã loại:** hosting **CHO** PHP gọi ra `www.okx.com` — `cham.php` chạy
+  tay in ra 7 kèo với `gia_ra`, `mfe`, `mae` đầy đủ. Trước đó đây là ẩn số có thể phá cả giai đoạn 2.
+  **Số liệu đầu tiên, và cách đọc đúng:** nhóm thật n=4, 0 thắng, baseline 45%, **Wilson 95% =
+  0%–49%**. Baseline nằm TRONG khoảng tin cậy → **chưa phân biệt được với ngẫu nhiên, không kết
+  luận gì**. Cả 7 kèo đều sinh trong ~30 phút đầu khi máy còn nguội (giao diện ghi "8 chưa ấm
+  máy", dải độ tin tường chỉ 35–54) → đây là nhóm kèo **kém thông tin nhất** hệ thống sẽ sinh ra.
+  Một điểm đáng ghi để theo dõi, KHÔNG phải kết luận: cả LONG lẫn SHORT đều thua, tất cả ăn trọn
+  cắt lỗ (`KV/kèo ≈ −1.11R`), và `mfe` chỉ đạt ~30% đường tới chốt. Nếu mẫu lớn còn giữ hình này
+  thì nghi vấn đầu tiên là `HE_SO_CAT = 0.30` quá chặt so với biên nhiễu — **đo, đừng chỉnh**.
+  **Phát hiện chưa khai thác:** sidebar 1Panel có **NodeJS** (Cài đặt ứng dụng) và **Terminal** +
+  **Quản Lý SSH** (Tính năng nâng cao). Nếu hosting cho chạy tiến trình Node liên tục thì xoá được
+  hẳn hạn chế "phải mở tab" mà không cần VPS. Chưa kiểm.
+
+- **2026-08-10 (19)** — **Đường ống chạy thật, và chốt cách chạy là MỞ TAY.** Không đụng code app.
+  Xác nhận dữ liệu chảy: **10 → 11 kèo**, trang `bao-cao.php` đọc được và tự cảnh báo đúng mực
+  (*"cần khoảng 800 kèo độc lập"*).
+  **Đã thử rồi bỏ cách chạy ẩn.** Chrome `--headless=new` + profile riêng `coin-bot` chạy được
+  thật (7–8 tiến trình, ~486 MB, không cửa sổ), nhưng chủ dự án chọn mở tay để dễ kiểm soát —
+  tiến trình ẩn đã tắt sạch. Giữ lại kiến thức ở mục "Chrome headless — đã thử, đã bỏ", quan
+  trọng nhất là **4 cờ chống hạ nhịp**: Chrome hạ `setInterval` xuống 1 lần/phút cho tab nền,
+  mà vòng phân tích là 2 giây → app vẫn chạy nhưng sinh kèo từ dữ liệu cũ cả phút, **hỏng im
+  lặng, không phát hiện được từ dữ liệu**.
+  **Ghi thêm một rủi ro dữ liệu chưa sửa:** danh sách "kèo đang mở" chỉ nằm trong RAM client,
+  không đọc từ server, nên tắt/bật lại app có thể sinh kèo **chồng thời gian** trên cùng một
+  coin → phá giả định độc lập. Kèm câu SQL kiểm và ghi rõ **đừng xoá, lọc bằng SQL lúc phân
+  tích**. Cách sửa gốc là `sinhKeo` hỏi server lúc khởi động — chưa làm.
+  Cũng ghi lại: máy có **Node v20.20.0**, `fetch` sẵn, `WebSocket` chỉ cần cờ
+  `--experimental-websocket` → bản Node chạy nền **không cần cài npm gì**, để dành cho sau.
 
 - **2026-08-10 (18)** — **Deploy xong hạ tầng, kiểm chứng đầu-cuối bằng `curl` thật.** Không đụng
   code — toàn bộ là việc hạ tầng.

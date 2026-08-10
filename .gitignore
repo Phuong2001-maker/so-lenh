@@ -3,3 +3,11 @@
 # Chứa mật khẩu DB + API_TOKEN thật. KHÔNG BAO GIỜ commit.
 # Bản mẫu để commit là php/config.mau.php.
 php/config.php
+
+# Token của bot — cùng chuỗi API_TOKEN, đọc lúc chạy. Không commit.
+bot/token.txt
+
+# Sinh ra lúc chạy, không phải mã nguồn.
+bot/bot.log
+trangthai.json
+trangthai.json.tmp

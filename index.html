@@ -102,10 +102,12 @@ body{background:var(--bg); color:var(--text);
 @media (max-width:660px){ #scanBody{grid-template-columns:1fr;} }
 .scanCol h3{font-size:10px; letter-spacing:.5px; color:var(--dim2);
   font-weight:600; margin:0 0 4px 8px;}
+/* Không còn cursor:pointer và không còn :hover — dòng quét nay KHÔNG bấm được
+   (ghim đặt bằng file ~/bot/ghim.txt). Con trỏ hình bàn tay trên thứ bấm không
+   ăn là dạng nói dối người dùng bằng giao diện. */
 .scanRow{display:grid; grid-template-columns:1fr 60px 76px 62px; gap:8px;
   font:12.5px var(--mono); padding:4px 8px; border-radius:6px;
-  cursor:pointer; align-items:baseline;}
-.scanRow:hover{background:var(--panel2);}
+  align-items:baseline;}
 .scanRow.theodoi{background:rgba(59,130,246,.09);}
 .scanRow.ghim{background:rgba(59,130,246,.17);
   box-shadow:inset 0 0 0 1px rgba(59,130,246,.45);}
@@ -142,12 +144,38 @@ const $ = id => document.getElementById(id);
    8 là mức đã đo chạy mượt trên máy để bàn; máy yếu thì hạ xuống 4-6. */
 const SO_COIN = 8;
 
+/* ============ CHẾ ĐỘ CHẠY — 'bot' hay 'xem' ============
+   'bot'  tiến trình Node trên server (bot/bot.js): giữ 40 WebSocket, phân tích,
+          sinh kèo, GHI DB. Là tiến trình DUY NHẤT được ghi. Chạy 24/24, không
+          cần trình duyệt nào mở.
+   'xem'  file này mở trong trình duyệt: chỉ tải trangthai.json rồi vẽ. Không
+          WebSocket, không phân tích, KHÔNG ghi một byte nào.
+
+   Trình duyệt KHÔNG BAO GIỜ vào được chế độ 'bot': cờ __BOT__ chỉ do bot.js đặt
+   trước khi nạp file này. Hai hệ quả quan trọng:
+   - Đặt trang lên web công khai cũng không thể làm bẩn dữ liệu.
+   - Xoá luôn lỗi "kèo chồng nhau": chỉ còn một tiến trình ghi, và nó không khởi
+     động lại mỗi lần có người mở trang, nên không còn quên kèo nào đang mở.
+   Thêm nữa: bot chạy sẵn hàng giờ nên mở trang xem là thấy lệnh NGAY, không phải
+   chờ 90 giây ấm máy như trước. */
+const LA_BOT = (typeof __BOT__ !== 'undefined' && __BOT__ === true);
+
 /* ============ GHI LOG LÊN SERVER ============
-   Để trống API_LOG là TẮT HẲN việc ghi (app chạy y như cũ, không gọi mạng).
-   Điền URL ghi.php sau khi tải thư mục php/ lên hosting, và dán token y hệt
-   giá trị API_TOKEN trong php/config.php. */
-const API_LOG   = 'https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php';
-const API_TOKEN = '36crTLiOB7DzTxzxPrUO0yOaVmK8s4rm';
+   Chỉ bot mới có URL; trang xem để trống nên guiLog() thoát ngay ở dòng đầu.
+   Token KHÔNG còn nằm trong file này: bot.js đọc từ ~/bot/token.txt (NGOÀI thư mục
+   web) rồi truyền vào. Trước đây token ghi thẳng ở đây, mà file này giờ nằm công
+   khai trên web — ai mở View Source cũng đọc được rồi đổ rác vào bảng keo. */
+/* __KHONG_GHI__ = chạy thử: bot làm mọi việc (WebSocket, phân tích, sinh kèo, ghi
+   ảnh trạng thái) nhưng KHÔNG gửi lên DB. Cần thiết để thử bot trên server mà
+   chưa đầu độc bảng keo — bật bot thật rồi mới phát hiện sai là dữ liệu đã vào,
+   mà kèo đã ghi thì không xoá được sạch mà không mất cả mẫu tốt. */
+const CHAY_THU  = (typeof __KHONG_GHI__ !== 'undefined' && __KHONG_GHI__ === true);
+const API_LOG   = (LA_BOT && !CHAY_THU) ? 'https://zewvir85.hiteckqualityconstruction.com.au/php/ghi.php' : '';
+const API_TOKEN = (typeof __API_TOKEN__ !== 'undefined') ? __API_TOKEN__ : '';
+
+/* Ảnh trạng thái: bot ghi đè mỗi 2 giây, trang xem đọc. Cùng tên miền nên
+   không dính CORS, và ghi đè một file thì không tốn lượt ghi DB nào. */
+const FILE_TRANG_THAI = 'trangthai.json';
 
 /* Ngưỡng GHI thấp hơn ngưỡng HIỂN THỊ (25) có chủ đích: ghi cả những kèo bị 4
    chốt chặn loại bỏ rồi đánh dấu bằng cột `chan`, để sau này đo được chốt chặn
@@ -185,7 +213,21 @@ function taoEngine(sym){
   EX.forEach((e, i) => {
     E.conns[e.key] = {key: e.key, label: e.label, state: 'off', note: 'chưa chạy',
       variant: '', bids: new Map(), asks: new Map(), pMul: 1, qMul: 1,
-      lastMsg: 0, ws: null, ws2: null, timers: [], exMid: null,
+      /* HAI đồng hồ, đừng gộp:
+         lastMsg  = nhận được BẤT KỲ gói nào, KỂ CẢ `pong`. Dùng cho phần dò biến thể
+                    tên hợp đồng (socket im hoàn toàn = cặp không tồn tại).
+         lastData = chỉ cập nhật khi nhận DỮ LIỆU THẬT (sổ lệnh / khớp lệnh).
+         Vì sao phải tách: socket có thể còn sống và vẫn trả pong đều đặn trong khi
+         kênh books đã im (đăng ký bị huỷ âm thầm, hợp đồng đổi trạng thái). Lúc đó
+         `lastMsg` luôn tươi nên canh chừng không bao giờ kích, sàn giữ nhãn 'live'
+         với sổ lệnh ĐÓNG BĂNG — và tệ nhất là `wallTrust` càng cộng điểm cho tường
+         đó vì nó "sống lâu", rồi bot sinh kèo với giá lấy từ sổ hàng giờ trước.
+         Đây đúng kiểu "chạy tiếp nhưng sai âm thầm", tệ hơn hẳn chết hẳn. */
+      lastMsg: 0, lastData: 0, soLanNoiLai: 0,
+      /* Riêng cho socket thứ 2 của Binance (aggTrade/forceOrder): nó sống độc lập với
+         socket sổ lệnh nên cần đồng hồ riêng và timer nối lại riêng. */
+      lastData2: 0, tWs2: null, moLaiWs2: null,
+      ws: null, ws2: null, timers: [], exMid: null,
       excluded: false, bit: 1 << i};
   });
   return E;
@@ -193,7 +235,14 @@ function taoEngine(sym){
 
 const engines = {};      /* sym -> engine */
 
-function setState(c, s, note){ c.state = s; c.note = note || ''; }
+function setState(c, s, note){
+  c.state = s; c.note = note || '';
+  /* Ghi mốc lúc rơi vào ngõ cụt 'off' để bộ canh chừng biết khi nào được thử lại.
+     Cố ý KHÔNG đặt sẵn ở taoEngine: conn mới sinh ra cũng mang state 'off' nhưng chưa
+     từng thử kết nối, mà `lucOff` chưa có thì bộ canh chừng bỏ qua — nếu không, nó sẽ
+     bắn thêm một lệnh khởi động chồng lên lệnh mà batDauEngine vừa gọi. */
+  if (s === 'off') c.lucOff = Date.now();
+}
 
 function clearConn(c){
   if (c.ws){ try{ c.ws.onclose = null; c.ws.onmessage = null; c.ws.close(); }catch(e){} }
@@ -201,7 +250,10 @@ function clearConn(c){
   c.ws = null; c.ws2 = null;
   c.timers.forEach(clearInterval); c.timers = [];
   c.bids.clear(); c.asks.clear();
-  c.lastMsg = 0; c.pMul = 1; c.qMul = 1; c.variant = '';
+  /* tWs2 nằm ngoài mảng c.timers nên phải dọn tay — bỏ sót là một Timeout mở lại ws2
+     nổ SAU khi kết nối đã bị tháo, mở một socket mồ côi không ai theo dõi. */
+  clearTimeout(c.tWs2); c.tWs2 = null; c.lastData2 = 0;
+  c.lastMsg = 0; c.lastData = 0; c.pMul = 1; c.qMul = 1; c.variant = '';
   c.exMid = null; c.excluded = false;
 }
 
@@ -238,7 +290,7 @@ function startBinance(E, g, variant){
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     const b = d.b || d.bids, a = d.a || d.asks;
     if (!b && !a) return;
-    c.lastMsg = Date.now();
+    c.lastMsg = c.lastData = Date.now();   /* DỮ LIỆU THẬT — xem chú thích ở lastData */
     if (c.state !== 'live') setState(c, 'live', 'đang nhận dữ liệu');
     applySide(c.bids, b || [], true);
     applySide(c.asks, a || [], true);
@@ -262,6 +314,7 @@ function startBinance(E, g, variant){
       let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
       const d = m.data;
       if (!d) return;
+      c.lastData2 = Date.now();   /* đồng hồ RIÊNG của ws2 — xem bộ canh chừng */
       if (d.e === 'aggTrade'){
         /* m=true: bên mua là maker → lệnh chủ động là BÁN */
         pushTrade(E, (d.m ? -1 : 1) * parseFloat(d.p) * c.pMul * parseFloat(d.q) * c.qMul);
@@ -273,9 +326,15 @@ function startBinance(E, g, variant){
     };
     ws2.onclose = () => {
       if (g !== E.gen || c.ws !== ws) return;
-      c.timers.push(setTimeout(openWs2, 3000));
+      /* MỘT biến `c.tWs2`, không push vào mảng `c.timers`. Mảng đó chỉ được dọn bởi
+         clearConn, mà đường nối lại của ws2 KHÔNG gọi clearConn — nên mỗi lần ws2 rớt
+         lại bỏ lại một Timeout đã chết trong mảng, và mảng lớn dần suốt nhiều ngày.
+         Rò rỉ nhỏ nhưng thật, và với bot chạy liên tục thì "nhỏ" là tính theo tuần. */
+      clearTimeout(c.tWs2);
+      c.tWs2 = setTimeout(openWs2, 3000);
     };
   };
+  c.moLaiWs2 = openWs2;      /* để bộ canh chừng mở lại được khi ws2 chết nửa-mở */
   openWs2();
 
   /* probe: sau 6s không có dữ liệu — nếu socket chưa từng mở là lỗi mạng (thử lại),
@@ -329,7 +388,7 @@ function startBybit(E, g, vi){
       return;
     }
     if (!d.topic || !d.data) return;
-    c.lastMsg = Date.now();
+    c.lastMsg = c.lastData = Date.now();   /* DỮ LIỆU THẬT — xem chú thích ở lastData */
     if (d.topic.indexOf('publicTrade') === 0){
       for (const t of d.data)
         pushTrade(E, (t.S === 'Buy' ? 1 : -1) * parseFloat(t.p) * c.pMul * parseFloat(t.v) * c.qMul);
@@ -401,7 +460,7 @@ async function startOkx(E, g){
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     if (d.event === 'error'){ setState(c, 'off', 'sàn báo lỗi: ' + (d.msg || d.code)); clearConn(c); return; }
     if (!d.data || !d.arg) return;
-    c.lastMsg = Date.now();
+    c.lastMsg = c.lastData = Date.now();   /* DỮ LIỆU THẬT — xem chú thích ở lastData */
     if (d.arg.channel === 'trades'){
       for (const t of d.data)
         pushTrade(E, (t.side === 'buy' ? 1 : -1) * parseFloat(t.px) * parseFloat(t.sz) * c.qMul);
@@ -467,7 +526,7 @@ function startBitget(E, g, vi){
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
     if (d.event === 'error'){ clearConn(c); startBitget(E, g, vi + 1); return; }
     if (!d.data || !d.data.length) return;
-    c.lastMsg = Date.now();
+    c.lastMsg = c.lastData = Date.now();   /* DỮ LIỆU THẬT — xem chú thích ở lastData */
     if (d.arg && d.arg.channel === 'trade'){
       /* gói snapshot đầu = 50 lệnh LỊCH SỬ (có thể cũ hàng giờ) — bỏ, chỉ nhận update mới */
       if (d.action !== 'snapshot'){
@@ -503,9 +562,24 @@ function startBitget(E, g, vi){
 function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
 function bitCount(x){ let n = 0; while (x){ n += x & 1; x >>= 1; } return n; }
 
+/* ⚠ CẮT MẢNG NGAY TẠI CHỖ NẠP, không đợi hàm đọc.
+   Trước đây `flowSec` chỉ bị cắt bên trong `flowStats()` và `liqs` bên trong
+   `liqStats()` — mà cả hai chỉ được gọi từ `analyze()`, và `analyze()` thoát ngay
+   khi `aggregate()` trả null (mất hết sàn). Trong khi đó hai nguồn NẠP vẫn chảy độc
+   lập với sức khoẻ sổ lệnh: socket thanh lý là socket dùng chung toàn sàn, còn
+   socket thứ hai của Binance (aggTrade) sống riêng với socket depth. Kết quả là hai
+   mảng này tăng KHÔNG GIỚI HẠN — với bot chạy nhiều ngày thì đây là đường rò rỉ bộ
+   nhớ thật sự duy nhất trong cả kiến trúc (wallBook dọn 24h, lvlWatch 600s,
+   oiHist chặn 240, hangDoi có trần).
+   Trần cứng cuối cùng để một cú bùng nổ tick không nuốt hết RAM trước khi cắt theo
+   thời gian kịp tác dụng. */
+const TRAN_FLOW = 20000, TRAN_LIQ = 20000;
+
 function pushTrade(E, n){
-  if (!isFinite(n)) return;
+  if (!E || !E.flowSec || !isFinite(n)) return;
   const s = Math.floor(Date.now() / 1000);
+  while (E.flowSec.length && s - E.flowSec[0].t > 7200) E.flowSec.shift();
+  if (E.flowSec.length > TRAN_FLOW) E.flowSec.splice(0, E.flowSec.length - TRAN_FLOW);
   const last = E.flowSec[E.flowSec.length - 1];
   /* GIỮ RIÊNG mua và bán, không chỉ hiệu số: n=0 có thể là "chợ chết" (không ai
      giao dịch) hoặc "hai phe đánh nhau ngang cơ" — hai trạng thái hoàn toàn khác
@@ -514,7 +588,15 @@ function pushTrade(E, n){
   if (last && last.t === s){ last.n += n; last.mua += mua; last.ban += ban; }
   else E.flowSec.push({t: s, n, mua, ban});
 }
-function pushLiq(E, side, n){ E.liqs.push({t: Date.now(), side, n}); }
+function pushLiq(E, side, n){
+  /* Kiểm `E.liqs` chứ không chỉ `E`: ở chế độ xem, engine do napTrangThai() dựng
+     không có mảng này. Lưới an toàn cho mọi đường gọi lạ trong tương lai. */
+  if (!E || !E.liqs) return;
+  const now = Date.now();
+  while (E.liqs.length && now - E.liqs[0].t > 1800e3) E.liqs.shift();
+  if (E.liqs.length > TRAN_LIQ) E.liqs.splice(0, E.liqs.length - TRAN_LIQ);
+  E.liqs.push({t: now, side, n});
+}
 
 function flowStats(E){
   const now = Math.floor(Date.now() / 1000);
@@ -885,7 +967,10 @@ function analyze(E, A){
    6 tín hiệu) trước đây chỉ lấy từ forceOrder của Binance, tức không có một byte
    nào từ chính sàn mà lệnh được đặt.
    ================================================================== */
-let wsLiq = null, lqTimers = [];
+/* Socket thanh lý dùng chung toàn sàn. Bốn biến giám sát vì đây là nguồn duy nhất của
+   tín hiệu sLiq (trọng số 0.20 — nặng thứ hai), mà nó nằm ngoài mọi engine nên không
+   được bộ canh chừng theo-sàn nào che. */
+let wsLiq = null, lqTimers = [], lqLastMsg = 0, lqLastData = 0, lqLoiCuoi = '';
 function moSocketThanhLy(){
   lqTimers.forEach(clearInterval); lqTimers = [];
   let ws;
@@ -893,13 +978,28 @@ function moSocketThanhLy(){
   catch(e){ setTimeout(moSocketThanhLy, 5000); return; }
   wsLiq = ws;
   ws.onopen = () => {
+    lqLastMsg = Date.now();          /* mốc khởi điểm để canh chừng không kích oan */
     ws.send(JSON.stringify({op:'subscribe', args:[{channel:'liquidation-orders', instType:'SWAP'}]}));
     lqTimers.push(setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000));
   };
   ws.onmessage = e => {
+    /* MỌI gói tin, kể cả `pong`, làm mới lqLastMsg. Ở đây dùng `pong` là ĐÚNG (khác
+       hẳn các sàn khác): thanh lý là sự kiện thưa, có thể im hàng giờ một cách hoàn
+       toàn bình thường, nên "im lặng dữ liệu" không thể dùng làm dấu hiệu chết. Ta tự
+       ping mỗi 25 giây nên pong phải về đều — quá 60 giây không gói nào là socket
+       thật sự đã chết. */
+    lqLastMsg = Date.now();
     if (e.data === 'pong') return;
     let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    /* Sàn TỪ CHỐI đăng ký thì trả {event:'error',...}. Bản trước lọc thẳng gói này đi
+       ở dòng dưới, nên socket vẫn mở, ping vẫn chạy, mà KHÔNG BAO GIỜ có dữ liệu.
+       Hậu quả: sLiq là tín hiệu nặng thứ hai (trọng số 0.20) — mọi kèo từ đó về sau
+       sinh ra với sig_lq = NULL, và vài tuần sau không cách nào phân biệt "không có
+       thanh lý" với "feed đã chết". Mất là mất vĩnh viễn. */
+    if (d.event === 'error'){ lqLoiCuoi = `${d.code || ''} ${d.msg || ''}`.trim(); return; }
+    if (d.event) return;                        /* subscribe/unsubscribe — bỏ qua */
     if (!d.data || !d.arg || d.arg.channel !== 'liquidation-orders') return;
+    lqLastData = Date.now();
     for (const row of d.data){
       const inst = row.instId || '';
       if (!inst.endsWith('-USDT-SWAP')) continue;
@@ -921,7 +1021,12 @@ function moSocketThanhLy(){
   };
   ws.onclose = () => { if (wsLiq === ws) setTimeout(moSocketThanhLy, 3000); };
 }
-moSocketThanhLy();
+/* ⚠ PHẢI bọc LA_BOT. Socket này nằm NGOÀI vòng đời engine (một socket dùng chung
+   toàn sàn) nên nó không được `batDauEngine` che, và đã bị bỏ sót đúng vì thế:
+   chế độ xem mở một WebSocket vô ích tới OKX, rồi mỗi gói thanh lý của coin đang
+   hiện lại ném TypeError vì engine do napTrangThai() dựng không có `liqs`.
+   BÀI HỌC: mọi thứ đặt ở cấp cao nhất, ngoài vòng đời engine, PHẢI tự kiểm LA_BOT. */
+if (LA_BOT) moSocketThanhLy();
 
 /* ==================================================================
    VÒNG ĐỜI ENGINE
@@ -938,10 +1043,19 @@ function batDauEngine(sym, thuTu){
   E.timers.push(setTimeout(() => { if (g === E.gen){ pollMarket(E, g); pollCandles(E, g); } }, tre));
   E.timers.push(setInterval(() => { if (g === E.gen) pollMarket(E, g); }, 60000));
   E.timers.push(setInterval(() => { if (g === E.gen) pollCandles(E, g); }, 900000));
-  startBinance(E, g, false);
-  startBybit(E, g, 0);
-  startOkx(E, g);
-  startBitget(E, g, 0);
+  /* RẢI CẢ phần mở socket theo cùng nhịp 400ms, không chỉ rải lệnh gọi REST.
+     Trước đây 4 socket của cả 8 engine được mở CÙNG LÚC ở khởi động nguội — 32 cú bắt
+     tay trong một nhịp, đủ để OKX chặn nhịp và trả `event:error`. Mà một lần bị chặn
+     là sàn đó rơi vào 'off', và mất OKX nghĩa là coin đó không sinh được kèo nào (mọi
+     giá vào/chốt lấy từ sổ riêng OKX). Bộ canh chừng có thử lại sau 5 phút, nhưng
+     phòng từ đầu rẻ hơn hẳn. */
+  E.timers.push(setTimeout(() => {
+    if (g !== E.gen) return;
+    startBinance(E, g, false);
+    startBybit(E, g, 0);
+    startOkx(E, g);
+    startBitget(E, g, 0);
+  }, tre));
   return E;
 }
 function dungEngine(sym){
@@ -1067,8 +1181,9 @@ function aggregate(E){
   return {bids, asks, bidsOkx: loc(bids0), asksOkx: loc(asks0), mid, step, bbOkx, baOkx};
 }
 
-/* nhịp phân tích: 2 giây/lần, chạy cho TẤT CẢ engine đang theo dõi */
-setInterval(() => {
+/* nhịp phân tích: 2 giây/lần, chạy cho TẤT CẢ engine đang theo dõi.
+   CHỈ chế độ bot. Trang xem không phân tích gì — nó chỉ vẽ lại ảnh trạng thái. */
+if (LA_BOT) setInterval(() => {
   for (const sym in engines){
     const E = engines[sym];
     const A = aggregate(E);
@@ -1078,14 +1193,80 @@ setInterval(() => {
   }
 }, 2000);
 
-/* canh chừng: sàn đang live mà im lặng quá lâu (quá cả chu kỳ ping/pong) thì báo chờ */
-setInterval(() => {
+/* ==================================================================
+   CANH CHỪNG — và NỐI LẠI, không chỉ đổi nhãn
+
+   Bản đầu chỉ `setState(c,'wait',...)` rồi để đó. Đường nối lại duy nhất còn lại là
+   `ws.onclose`, mà socket "nửa mở" (half-open) qua NAT/proxy thì KHÔNG BAO GIỜ sinh
+   onclose — nên nó nằm ở 'wait' vô thời hạn. Với app trong tab trình duyệt thì người
+   dùng F5 là xong; với bot chạy nhiều ngày không ai xem thì đó là mất một sàn vĩnh viễn.
+
+   Đo bằng `lastData` (dữ liệu thật) chứ không `lastMsg` (tính cả pong) — lý do ghi ở
+   chỗ khai báo hai trường đó.
+   ================================================================== */
+/* Nối lại luôn bắt đầu từ BIẾN THỂ ĐẦU (variant/vi = 0), tức làm lại như lần đầu.
+   Không truyền biến thể cũ vào: `clearConn` đã xoá `c.variant`, và quan trọng hơn là
+   tên hợp đồng có thể đã đổi (sàn đổi hệ số 1000X ↔ X1000) đúng trong lúc mất kết nối. */
+const MO_LAI = {
+  binance: (E, g) => startBinance(E, g, false),   /* khớp y batDauEngine */
+  bybit:   (E, g) => startBybit(E, g, 0),
+  okx:     (E, g) => startOkx(E, g),
+  bitget:  (E, g) => startBitget(E, g, 0),
+};
+
+if (LA_BOT) setInterval(() => {
   const now = Date.now();
   for (const sym in engines){
-    for (const k in engines[sym].conns){
-      const c = engines[sym].conns[k];
-      if (c.state === 'live' && now - c.lastMsg > 35000) setState(c, 'wait', 'mất dữ liệu — chờ nhận lại');
+    const E = engines[sym];
+    for (const k in E.conns){
+      const c = E.conns[k];
+      /* 'live' mà kênh dữ liệu im quá 60 giây (gấp đôi chu kỳ ping dài nhất là 25s,
+         nên không thể là nhịp ping bình thường) → nối lại thật. */
+      if (c.state === 'live' && c.lastData && now - c.lastData > 60000){
+        c.soLanNoiLai++;
+        clearConn(c);
+        setState(c, 'wait', `kênh im ${Math.round((now - c.lastData) / 1000)}s — nối lại (lần ${c.soLanNoiLai})`);
+        const g = E.gen, mo = MO_LAI[k];
+        if (mo) c.timers.push(setTimeout(() => { if (g === E.gen) mo(E, g); }, 1000));
+      }
+      /* 'off' là ngõ cụt: sàn báo lỗi hoặc dò hết biến thể tên hợp đồng rồi bỏ. Với
+         bot chạy nhiều ngày, "bỏ vĩnh viễn" là sai — một lỗi tạm thời lúc khởi động
+         nguội (8 engine bắt tay OKX cùng lúc, dễ bị chặn nhịp) sẽ giết hẳn sàn đó cho
+         coin đó. Nặng nhất là mất OKX: mọi giá VÀO/CHỐT lấy từ SỔ RIÊNG OKX, nên
+         bestWall trả null và coin đó KHÔNG BAO GIỜ sinh kèo nữa, trong khi `pred.ready`
+         vẫn true và 3 sàn còn lại vẫn 'live'. Coin GHIM thì máy quét không bao giờ gỡ
+         nên cũng không có đường tự hồi phục.
+         Nên: thử lại sau 5 phút, mãi mãi. Cặp thật sự không tồn tại thì lần thử sau
+         cũng chỉ tốn một lần bắt tay mỗi 5 phút — rẻ hơn hẳn mất một sàn nhiều ngày. */
+      else if (c.state === 'off' && c.lucOff && now - c.lucOff > 300000){
+        c.soLanNoiLai++;
+        const g = E.gen, mo = MO_LAI[k];
+        if (mo){ setState(c, 'wait', `thử lại sau khi tắt (lần ${c.soLanNoiLai})`); mo(E, g); }
+      }
+
+      /* Socket thứ 2 của Binance (aggTrade + forceOrder) sống RIÊNG với socket sổ lệnh
+         nên nó có thể chết nửa-mở mà socket depth vẫn 'live'. Khi đó dòng tiền khớp
+         mất nguồn Binance âm thầm — mà sFlow30 (0.30) + sFlow5 (0.15) là 45% tổng
+         trọng số, tức điểm S lệch hệ thống theo hướng không đoán được, không một chỉ
+         số nào nói lên. Coin nào cũng phải có khớp lệnh trong 3 phút ở mức thanh khoản
+         > 200k USD/24h, nên im quá 180 giây là bất thường. */
+      if (k === 'binance' && c.state === 'live' && c.lastData2
+          && now - c.lastData2 > 180000 && c.moLaiWs2){
+        c.soLanNoiLai++;
+        c.lastData2 = now;                  /* tránh kích lại liên tục khi mở lại chậm */
+        try{ if (c.ws2) c.ws2.close(); }catch(e){}
+        c.moLaiWs2();
+      }
     }
+  }
+
+  /* Canh chừng socket THANH LÝ (ngoài mọi engine, nên không bộ nào khác che nó).
+     Đo bằng lqLastMsg — tính cả `pong` — vì thanh lý là sự kiện thưa, im hàng giờ là
+     bình thường; ta tự ping 25 giây/lần nên quá 60 giây không gói nào là socket chết. */
+  if (wsLiq && lqLastMsg && now - lqLastMsg > 60000){
+    lqLoiCuoi = `im ${Math.round((now - lqLastMsg) / 1000)}s — nối lại`;
+    lqLastMsg = now;                        /* tránh đóng liên tiếp trong lúc mở lại */
+    try{ wsLiq.close(); }catch(e){}         /* onclose tự gọi lại moSocketThanhLy */
   }
 }, 3000);
 
@@ -1170,7 +1351,10 @@ function theCoin(E, K){
   if (P.tuoiCoin !== null && P.tuoiCoin < 7)
     canhBao.push(`⚠ Coin mới niêm yết ${P.tuoiCoin.toFixed(0)} ngày — chưa đủ lịch sử để biên khung và điểm tin tường có nghĩa`);
   if (canhBao.length) h += `<div class="ccWarn">${canhBao.join('<br>')}</div>`;
-  if (E.brkAlert && Date.now() - E.brkAlert.t < 600e3)
+  /* gioBot() chứ không Date.now(): `brkAlert.t` do bot đặt bằng đồng hồ bot, so với
+     đồng hồ trình duyệt là sai khi hai máy lệch giờ — cảnh báo ⚡ sẽ ẩn ngay hoặc
+     dính quá 10 phút, làm sai nghĩa của chữ "vừa". */
+  if (E.brkAlert && gioBot() - E.brkAlert.t < 600e3)
     h += `<div class="ccBrk ${E.brkAlert.warn ? 'w1' : 'cUp'}">${E.brkAlert.txt}</div>`;
 
   /* ---- vùng giao dịch ---- */
@@ -1241,7 +1425,59 @@ function theCoin(E, K){
   return `<div class="coinCard ${isLong ? 'long' : 'short'}">${h}</div>`;
 }
 
+/* DÒNG CHẨN ĐOÁN — tách thành hàm riêng và gọi TRƯỚC khi vẽ thẻ.
+   Trước đây nó nằm ở cuối renderLists(), nghĩa là một ngoại lệ khi dựng thẻ coin
+   sẽ bịt miệng đúng cái lưới an toàn duy nhất: trang đứng hình mà dòng chú thích
+   kẹt ở giá trị cũ, không bao giờ đổi. Chẩn đoán phải được vẽ trước nội dung. */
+function veChuThich(){
+  const syms = Object.keys(engines);
+  let live = 0, am = 0, chet = 0;
+  for (const s of syms){
+    live += Object.values(engines[s].conns || {}).filter(c => c.state === 'live').length;
+    const P = engines[s].pred || {};
+    /* Tách hai nguyên nhân: "chưa hết warmup 90 giây" khác hẳn "mất hết sàn nên
+       không gộp được sổ". Gộp chung một nhãn là người xem chờ mãi một thứ sẽ không
+       bao giờ tới. */
+    if (P.ready && P.warmLeft > 0) am++;
+    else if (!P.ready) chet++;
+  }
+  const tLog = logStat.loi ? `log: ${logStat.gui} gửi · ${logStat.loi} LỖI (${logStat.loiCuoi})`
+    : `log: ${logStat.gui} gửi${logStat.cho ? ' · ' + logStat.cho + ' chờ' : ''}`;
+  let t = `${syms.length} coin đang theo dõi · ${live}/${syms.length * 4} sàn live`
+    + (am ? ` · ${am} chưa ấm máy` : '')
+    + (chet ? ` · ⚠ ${chet} MẤT SỔ` : '')
+    + ' · ' + tLog;
+
+  if (!LA_BOT){
+    /* Bot chết là kiểu hỏng IM LẶNG nguy hiểm nhất: ảnh đứng lại, trang vẫn vẽ y
+       nguyên thẻ cũ, người xem tưởng thị trường đang yên.
+       ⚠ ĐO BẰNG MỘT ĐỒNG HỒ DUY NHẤT. Bản đầu lấy `Date.now() - j.luc`, tức trừ
+       đồng hồ trình duyệt cho đồng hồ server — điện thoại lệch NTP vài phút là
+       cảnh báo này im vĩnh viễn (lệch chậm) hoặc kêu vĩnh viễn (lệch nhanh), mà
+       kêu oan vài lần là người xem học cách phớt lờ đúng cảnh báo quan trọng nhất.
+       Nay đo khoảng cách từ lần CUỐI nhận được ảnh MỚI, cùng một đồng hồ client —
+       miễn nhiễm lệch giờ, và bắt được cả trường hợp bot còn sống nhưng ghi ảnh
+       lỗi (file không đổi nội dung). */
+    const tre = mocAnhMoi ? Math.round((Date.now() - mocAnhMoi) / 1000) : null;
+    if (verBot && verBot !== VER_TRONG_SO)
+      /* Lỗ riêng của kiến trúc "bot NẠP index.html": sửa thuật toán rồi tải file
+         mới lên mà quên restart bot → bot vẫn chạy khối <script> đã eval từ trước,
+         ghi DB bằng bản cũ với cột `ver` cũ, còn trang thì vẽ theo bản mới. Không
+         có cách nào khác phát hiện. */
+      t = `⛔ BOT ĐANG CHẠY BẢN CŨ (${verBot} ≠ ${VER_TRONG_SO}) — phải dung.sh rồi chay.sh`;
+    else if (napLoi)
+      t = `⛔ ẢNH TRẠNG THÁI SAI CẤU TRÚC (${napLoi}) — bot và trang lệch phiên bản?`;
+    else if (tre === null)
+      t = '⛔ CHƯA TẢI ĐƯỢC trangthai.json — bot có đang chạy không?';
+    else if (tre > 30)
+      t = `⛔ DỮ LIỆU CŨ ${tre}s — bot có thể đã chết, ĐỪNG đọc số bên dưới`;
+    else t = `XEM · dữ liệu ${tre}s trước · ` + t;
+  }
+  $('scanNote').textContent = t;
+}
+
 function renderLists(){
+  veChuThich();                          /* vẽ TRƯỚC, xem lý do ở trên */
   const longs = [], shorts = [];
   for (const sym of Object.keys(engines)){
     const K = keoCua(engines[sym]);
@@ -1258,26 +1494,170 @@ function renderLists(){
     : '<div class="emptyList">Chưa coin nào đủ điều kiện short</div>';
   $('cntLong').textContent = longs.length;
   $('cntShort').textContent = shorts.length;
-
-  /* dòng chú thích của khối QUÉT OKX gánh luôn phần chẩn đoán: bao nhiêu coin đang
-     theo dõi, bao nhiêu kết nối sàn còn sống, bao nhiêu coin chưa ấm máy — vì coin
-     không có tín hiệu nay hoàn toàn không hiện ở đâu, hai bảng trống trơn trong 90
-     giây đầu và không có dòng này thì không phân biệt được với app hỏng */
-  const syms = Object.keys(engines);
-  let live = 0, am = 0;
-  for (const s of syms){
-    live += Object.values(engines[s].conns).filter(c => c.state === 'live').length;
-    const P = engines[s].pred;
-    if (!P.ready || P.warmLeft > 0) am++;
-  }
-  const tLog = !API_LOG ? 'log: TẮT'
-    : logStat.loi ? `log: ${logStat.gui} gửi · ${logStat.loi} LỖI (${logStat.loiCuoi})`
-    : `log: ${logStat.gui} gửi${hangDoi.length ? ' · ' + hangDoi.length + ' chờ' : ''}`;
-  $('scanNote').textContent = `${syms.length} coin đang theo dõi · ${live}/${syms.length * 4} sàn live`
-    + (am ? ` · ${am} chưa ấm máy` : '')
-    + ' · ' + tLog
-    + ' · bấm một dòng để ghim / bỏ ghim';
   document.title = `${longs.length}L/${shorts.length}S — Sổ Lệnh Gộp`;
+}
+
+/* ==================================================================
+   ẢNH TRẠNG THÁI — cầu nối duy nhất giữa bot và trang xem
+
+   Bot gọi anhTrangThai() mỗi 2 giây, bot.js ghi kết quả ra trangthai.json.
+   Trang xem gọi napTrangThai() để dựng lại đúng cấu trúc mà theCoin()/keoCua()
+   đang cần, rồi vẽ bằng CÙNG hàm vẽ. Không có hàm vẽ thứ hai — tách ra là vài
+   tuần sau sửa một bên quên bên kia, rồi xem một thứ mà bot ghi thứ khác.
+   ================================================================== */
+/* Trạng thái phía trang xem. Ba biến, ba việc khác nhau — đừng gộp:
+   lucBot     = j.luc của ảnh đang hiển thị, đo bằng ĐỒNG HỒ BOT. Dùng làm "giờ hiện
+                tại" cho mọi mốc thời gian do bot đặt (vd brkAlert.t), vì so mốc của
+                bot với đồng hồ trình duyệt là sai khi hai máy lệch giờ.
+   mocAnhMoi  = lúc CUỐI nhận được ảnh MỚI, đo bằng ĐỒNG HỒ TRÌNH DUYỆT. Dùng tính
+                độ trễ — cùng một đồng hồ nên miễn nhiễm lệch giờ.
+   napLoi     = lý do nạp thất bại, để phân biệt "không tải được" với "tải được
+                nhưng ảnh sai cấu trúc" — hai thứ này cần hai hướng xử lý khác nhau. */
+let lucBot = 0, mocAnhMoi = 0, verBot = '', napLoi = '';
+
+/* "Giờ hiện tại" theo đồng hồ đã đặt các mốc: bot thì là đồng hồ của chính nó,
+   trang xem thì là đồng hồ bot đọc từ ảnh. */
+const gioBot = () => LA_BOT ? Date.now() : (lucBot || Date.now());
+
+function anhTrangThai(){
+  logStat.cho = hangDoi.length;
+  const coins = [];
+  for (const sym in engines){
+    const E = engines[sym], P = E.pred;
+    /* Trạng thái 4 sàn phải gửi cho MỌI coin đang theo dõi, kể cả coin chưa ấm máy.
+       Bỏ coin chưa ấm ra thì dòng chẩn đoán đếm thiếu và báo ví dụ "24/32 sàn live"
+       trong khi thật ra 32 sàn đều sống — nhìn như đang có sàn chết. */
+    const conns = {};
+    for (const k in E.conns) conns[k] = {state: E.conns[k].state};
+    if (!P || !P.ready){ coins.push({sym, conns, pred: {ready: false}}); continue; }
+
+    /* CHỈ lấy 2 bản ghi tường mà wallInfo() sẽ tra. Cả wallBook có thể vài trăm
+       bản ghi mỗi coin — gửi hết là vài trăm KB mỗi 2 giây, thừa 99% mà lại làm
+       nặng đường truyền, nhất là khi xem bằng điện thoại. */
+    const tuong = {};
+    for (const [side, W] of [['b', P.sup], ['a', P.res]]){
+      if (!W) continue;
+      const k = wallKey(side, W.p), w = E.wallBook[k];
+      if (w) tuong[k] = {f: w.f, l: w.l, sv: w.sv || 0, fl: w.fl || 0, pl: w.pl || 0};
+    }
+    coins.push({
+      sym, pred: P, conns, tuong, brkAlert: E.brkAlert,
+      /* market: đúng 3 trường mà thẻ coin dùng. oiHist/ranges/atr4h/oi là dữ liệu
+         tính toán nội bộ của bot, gửi đi chỉ phình ảnh trạng thái. */
+      market: {ref: E.market.ref ? {c24: E.market.ref.c24} : null,
+               funding: E.market.funding, fundH: E.market.fundH}
+    });
+  }
+  /* Bảng QUÉT chỉ hiện 6 dòng mỗi bên. Gửi 15 mỗi bên làm vùng đệm: đủ dư nếu sau
+     này nới số dòng, mà vẫn nhỏ hơn gửi cả 400+ ticker của sàn. */
+  const top = (f, cmp) => [...scan.rows].filter(f).sort(cmp).slice(0, 15);
+  /* Đếm coin THIẾU NẾN 48h. Đây là kiểu hỏng nguy hiểm nhất trong nhóm im lặng: mọi
+     chỉ báo đều xanh (đủ coin, 32/32 sàn live, 0 chưa ấm máy) và trang xem vẫn vẽ đủ
+     thẻ có giá vào/chốt/cắt, NHƯNG sinhKeo() thoát ở `if (!E.market.ranges) return`
+     nên bảng keo không nhận thêm một dòng nào. "log 0 gửi" khi đó bị đọc thành "chưa
+     có tín hiệu đáng ghi" thay vì "bộ ghi đã tê liệt". */
+  let thieuNen = 0;
+  for (const sym in engines) if (!engines[sym].market.ranges) thieuNen++;
+  return {
+    luc: Date.now(), ver: VER_TRONG_SO, soCoin: SO_COIN,
+    coins,
+    scan: {
+      rows: [...top(r => r.chg24 > 0, (a, b) => b.chg24 - a.chg24),
+             ...top(r => r.chg24 < 0, (a, b) => a.chg24 - b.chg24)],
+      ghim: [...scan.ghim],
+      lucQuet: scan.lucQuet, loi: scan.loi, loiCuoi: scan.loiCuoi
+    },
+    /* Sức khoẻ socket thanh lý: nguồn duy nhất của sLiq (trọng số 0.20) và nó nằm
+       ngoài mọi engine, nên nếu không đưa vào đây thì nó chết hoàn toàn im lặng. */
+    lq: {lastMsg: lqLastMsg, lastData: lqLastData, loiCuoi: lqLoiCuoi},
+    log: {gui: logStat.gui, loi: logStat.loi, loiCuoi: logStat.loiCuoi,
+          cho: logStat.cho, mat: logStat.mat, thieuNen}
+  };
+}
+
+function napTrangThai(j){
+  /* Đọc PHÒNG VỆ và đọc HẾT trước khi chạm vào `engines`. Bản đầu xoá sạch engines
+     ngay dòng đầu rồi mới đọc `j.scan.rows` — ảnh thiếu khối `scan` hay `log` (bot
+     và trang lệch phiên bản) là ném lỗi giữa đường, để lại engines đã bị xoá một
+     nửa và `tuoiAnh` không được gán, làm cảnh báo báo SAI nguyên nhân. */
+  if (!j || typeof j !== 'object') { napLoi = 'khong phai object'; return; }
+  const S = j.scan || {}, L = j.log || {}, cs = j.coins;
+  if (!Array.isArray(cs)) { napLoi = 'thieu mang coins'; return; }
+
+  /* Bỏ ảnh KHÔNG mới hơn ảnh đang hiển thị. Không có chốt này thì khi mạng tắc,
+     phản hồi về không đúng thứ tự và ảnh CŨ ghi đè ảnh MỚI: thẻ nhảy lùi về trạng
+     thái vài giây trước, và độ trễ hiện lên nhảy loạn — mà chính con số đó là cơ sở
+     để người xem tin hay không tin màn hình. */
+  if (j.luc && lucBot && j.luc <= lucBot) return;
+
+  napLoi = '';
+  verBot = j.ver || '';
+  for (const k in engines) delete engines[k];
+  /* Coin chưa ấm máy vẫn có mặt (chỉ mang conns + pred.ready=false): bảng QUÉT vẫn
+     đánh dấu ▶ đúng, số "chưa ấm máy" đếm đúng, mà keoCua() vẫn trả null nên chúng
+     không hiện thành thẻ. Không có danh sách "theodoi" riêng — một danh sách thứ hai
+     nói cùng một việc là chỗ để hai bên lệch nhau. */
+  for (const c of cs){
+    if (!c || !c.sym) continue;
+    engines[c.sym] = {sym: c.sym, pred: c.pred || {ready: false}, market: c.market || {},
+                      conns: c.conns || {}, wallBook: c.tuong || {},
+                      brkAlert: c.brkAlert || null};
+  }
+  scan.rows = Array.isArray(S.rows) ? S.rows : [];
+  scan.ghim.clear();
+  (Array.isArray(S.ghim) ? S.ghim : []).forEach(s => scan.ghim.add(s));
+  logStat.gui = L.gui || 0; logStat.loi = L.loi || 0;
+  logStat.loiCuoi = L.loiCuoi || ''; logStat.cho = L.cho || 0;
+  lucBot = j.luc || 0;
+  mocAnhMoi = Date.now();
+}
+
+/* Tải lại ảnh rồi vẽ.
+   - Chống cache hai lớp (no-store + `?t=`): một bản bị cache là trang đứng hình mà
+     không có dấu hiệu gì.
+   - Trần thời gian 1500ms < nhịp 2000ms: không có nó thì mạng tắc là các fetch dồn
+     thành đống, trình duyệt chỉ cho 6 kết nối một host nên phần còn lại xếp hàng và
+     độ trễ thật còn tệ hơn.
+   - Phần VẼ bọc try riêng và PHẢI hiện lỗi ra màn hình. Trước đây `render()` nằm
+     ngoài try: một ngoại lệ khi dựng thẻ là trang đóng băng hoàn toàn — thẻ cũ còn
+     nguyên, dòng chú thích kẹt ở giá trị cuối, lỗi chỉ nằm trong Console mà người
+     xem trên điện thoại không bao giờ mở. Đúng kiểu hỏng im lặng bị cấm. */
+async function taiTrangThai(){
+  const huy = new AbortController();
+  const hetGio = setTimeout(() => huy.abort(), 1500);
+  try{
+    const r = await fetch(FILE_TRANG_THAI + '?t=' + Date.now(),
+                          {cache: 'no-store', signal: huy.signal});
+    if (r.ok) napTrangThai(await r.json());
+  }catch(e){ /* giữ ảnh cũ; cảnh báo độ trễ trong scanNote sẽ tự nói lên */ }
+  finally{ clearTimeout(hetGio); }
+
+  try{ render(); renderScan(); }
+  catch(e){
+    try{ $('scanNote').textContent = '⛔ LỖI VẼ: ' + (e && e.message || e)
+      + ' — số liệu bên dưới có thể đã cũ'; }catch(_){}
+  }
+}
+
+/* Đồng bộ tập ghim từ danh sách (bot đọc ~/bot/ghim.txt). Giữ ĐÚNG luật của cơ chế
+   ghim cũ: ghim coin chưa theo dõi mà tập đã đầy thì nhường chỗ bằng coin KHÔNG
+   ghim yếu nhất; đầy toàn coin ghim thì không nhận thêm. */
+function dongBoGhim(list){
+  const moi = new Set(list.filter(Boolean));
+  for (const s of [...scan.ghim]) if (!moi.has(s)) scan.ghim.delete(s);
+  for (const s of moi){
+    if (scan.ghim.has(s)) continue;
+    scan.ghim.add(s);
+    if (engines[s]) continue;
+    if (Object.keys(engines).length < SO_COIN){ batDauEngine(s, 0); continue; }
+    let yeu = '', bs = Infinity;
+    for (const k in engines){
+      if (scan.ghim.has(k)) continue;
+      const P = engines[k].pred, v = P.ready ? Math.abs(P.S) : 0;
+      if (v < bs){ bs = v; yeu = k; }
+    }
+    if (yeu){ dungEngine(yeu); batDauEngine(s, 0); }
+  }
 }
 
 /* 1 giây/lần là đủ: dữ liệu chỉ đổi mỗi 2 giây theo nhịp phân tích, mà mỗi lần vẽ
@@ -1303,7 +1683,10 @@ const hangDoi = [];        /* outbox trong RAM, mất khi F5 — chấp nhận �
 let dangGui = false;
 /* Đếm để hiển thị: không có tín hiệu sống thì sai token hay sai URL cũng im lặng,
    chạy cả tuần mới phát hiện bảng rỗng. */
-const logStat = {gui: 0, loi: 0, loiCuoi: ''};
+/* `mat` = số kèo bị NÉM khỏi hàng đợi vì vượt trần. Không có bộ đếm này thì mất mẫu
+   là mất im lặng: `loi` tăng thì dễ đọc thành "mạng chập tạm thời" trong khi thực tế
+   kèo mới sinh ra đang bị xoá ngay. */
+const logStat = {gui: 0, loi: 0, loiCuoi: '', cho: 0, mat: 0};
 
 function tinhChan(P){
   /* bitmask 4 chốt chặn. 0 = kèo THẬT (qua hết), >0 = kèo bị chặn */
@@ -1355,7 +1738,13 @@ function sinhKeo(E){
 
   E.keoMo = {uid: k.uid, han};
   hangDoi.push(k);
-  if (hangDoi.length > 40) hangDoi.splice(0, hangDoi.length - 40);
+  /* Trần 500 chứ không 40: mỗi kèo ~1 KB, 500 kèo là 0,5 MB — không đáng gì so với
+     mất mẫu. Trần 40 cũ chỉ đủ ~1 ngày, nên một lần token lệch là mọi kèo mới bị xoá
+     ngay trong khi bot vẫn chạy và vẫn sinh kèo. Và mỗi lần ném PHẢI đếm. */
+  if (hangDoi.length > 500){
+    logStat.mat += hangDoi.length - 500;
+    hangDoi.splice(0, hangDoi.length - 500);
+  }
 }
 
 /* Gửi theo LÔ mỗi 10 giây. Fire-and-forget, timeout 5 giây — vòng phân tích
@@ -1381,10 +1770,9 @@ async function guiLog(){
   }catch(e){ logStat.loi++; logStat.loiCuoi = e.name === 'AbortError' ? 'quá 5s' : 'mạng'; }
   finally{ clearTimeout(hetGio); dangGui = false; }
 }
-setInterval(guiLog, 10000);
+if (LA_BOT) setInterval(guiLog, 10000);
 
 function render(){ renderLists(); }
-setInterval(render, 1000);
 
 /* ==================================================================
    MÁY QUÉT OKX — chọn ra SO_COIN coin nóng nhất rồi bật/tắt engine
@@ -1392,7 +1780,10 @@ setInterval(render, 1000);
 /* ghim = tập coin người dùng tự chọn, máy quét KHÔNG được phép gỡ.
    Thay cho nút TỰ ĐỘNG cũ: không còn trạng thái bật/tắt toàn cục nào có thể mắc kẹt,
    coin nào không ghim thì vẫn xoay vòng tự động như thường. */
-const scan = {rows: [], hist: {}, ghim: new Set()};
+const scan = {rows: [], hist: {}, ghim: new Set(),
+  /* Ba trường giám sát máy quét — không có chúng thì "bot sống mà không theo dõi
+     coin nào" là một trạng thái hoàn toàn im lặng. */
+  lucQuet: 0, loi: 0, loiCuoi: ''};
 
 async function pollScan(){
   try{
@@ -1417,9 +1808,24 @@ async function pollScan(){
         heat: Math.abs(chg15 !== null ? chg15 : 0) * 6 + Math.abs(last / open - 1)});
     }
     scan.rows = rows;
+    scan.lucQuet = Date.now();
+    scan.loiCuoi = '';
     dongBoEngine();
-    renderScan();
-  }catch(e){}
+    /* KHÔNG gọi renderScan() ở đây. pollScan chỉ chạy ở chế độ bot, mà bot không có
+       DOM thật — dựng chuỗi HTML rồi ném vào bản giả lập là việc thừa mỗi 60 giây.
+       Trang xem tự vẽ lại trong taiTrangThai(). */
+  }catch(e){
+    /* KHÔNG được nuốt im lặng. pollScan là thứ DUY NHẤT gọi dongBoEngine(), nên nếu
+       lần quét đầu thất bại (hosting chặn gọi ra ngoài, OKX chặn IP datacenter, DNS
+       chập lúc khởi động) thì bot sống, ảnh vẫn ghi mỗi 2 giây, nhưng KHÔNG có coin
+       nào được theo dõi — vĩnh viễn. Dòng sức khoẻ khi đó in "0 coin · 0/0 sàn live"
+       trông y như một dòng log bình thường, và trang xem hiện ảnh MỚI với hai bảng
+       trống, không phân biệt được với "thị trường đang yên". Cron mỗi 5 phút cũng
+       không cứu vì tiến trình không hề chết.
+       (Đừng viết "sao-gạch-5" trong comment khối — nó đóng comment sớm.) */
+    scan.loi++;
+    scan.loiCuoi = String((e && e.message) || e);
+  }
 }
 
 /* Đồng bộ tập engine với top coin nóng nhất.
@@ -1451,7 +1857,7 @@ function dongBoEngine(){
 function renderScan(){
   const pct = x => (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
   const volTxt = v => v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.round(v / 1e3) + 'K';
-  const row = r => `<div class="scanRow${scan.ghim.has(r.sym) ? ' ghim' : engines[r.sym] ? ' theodoi' : ''}" data-s="${r.sym}">
+  const row = r => `<div class="scanRow${scan.ghim.has(r.sym) ? ' ghim' : engines[r.sym] ? ' theodoi' : ''}">
     <span class="s">${scan.ghim.has(r.sym) ? '📌' : engines[r.sym] ? '▶ ' : ''}${r.sym}</span>
     <span class="${r.chg24 >= 0 ? 'up' : 'dn'}">${pct(r.chg24)}</span>
     <span class="${(r.chg15 || 0) >= 0 ? 'up' : 'dn'}">${r.chg15 !== null ? "15': " + pct(r.chg15) : ''}</span>
@@ -1460,34 +1866,38 @@ function renderScan(){
   const dns = [...scan.rows].filter(r => r.chg24 < 0).sort((a, b) => a.chg24 - b.chg24).slice(0, 6);
   $('scanUp').innerHTML = '<h3>TOP TĂNG 24h</h3>' + ups.map(row).join('');
   $('scanDn').innerHTML = '<h3>TOP GIẢM 24h</h3>' + dns.map(row).join('');
-  document.querySelectorAll('.scanRow').forEach(el => {
-    el.onclick = () => {
-      const s = el.dataset.s;
-      if (scan.ghim.has(s)){
-        /* bỏ ghim: trả coin về cho máy quét tự xoay vòng, KHÔNG gỡ engine ngay
-           (nó vẫn chạy tới khi rớt khỏi vùng đệm, khỏi phí wallBook đã tích) */
-        scan.ghim.delete(s);
-      } else if (!engines[s] && Object.keys(engines).length >= SO_COIN){
-        /* chưa theo dõi mà đã đủ chỗ: nhường chỗ bằng coin KHÔNG ghim yếu nhất */
-        let yeu = '', bs = Infinity;
-        for (const k in engines){
-          if (scan.ghim.has(k)) continue;
-          const P = engines[k].pred;
-          const v = P.ready ? Math.abs(P.S) : 0;
-          if (v < bs){ bs = v; yeu = k; }
-        }
-        if (yeu){ dungEngine(yeu); scan.ghim.add(s); batDauEngine(s, 0); }
-        /* ghim kín SO_COIN chỗ rồi thì không nhận thêm — bỏ ghim bớt một con trước */
-      } else {
-        scan.ghim.add(s);
-        if (!engines[s]) batDauEngine(s, 0);
-      }
-      render(); renderScan();
-    };
-  });
+  /* ĐÃ BỎ: bấm một dòng để ghim/bỏ ghim.
+     renderScan() nay CHỈ chạy ở chế độ xem (bot không vẽ), mà chế độ xem thì
+     không sở hữu tập engine — bấm vào chỉ sửa được bản sao trong RAM của trình
+     duyệt rồi bị ghi đè sau 2 giây khi nạp ảnh mới. Giữ lại là một nút bấm nhìn
+     như có tác dụng mà thật ra không, tệ hơn là không có nút.
+     Ghim nay đặt bằng FILE: ~/bot/ghim.txt, mỗi dòng một mã coin, bot đọc lại mỗi
+     30 giây và áp qua dongBoGhim(). Muốn có nút bấm trở lại thì cần một endpoint
+     điều khiển có xác thực — mà làm vậy là phải đặt token vào trang công khai. */
 }
-setInterval(pollScan, 60000);
-pollScan();
+
+/* ==================================================================
+   KHỞI ĐỘNG — hai nhánh, không bao giờ chạy cả hai
+   ================================================================== */
+if (LA_BOT){
+  setInterval(pollScan, 60000);
+  pollScan();
+} else {
+  /* 2 giây/lần, đúng bằng nhịp bot ghi ảnh. Trước đây vẽ mỗi giây vì dữ liệu nằm
+     ngay trong RAM; giờ dữ liệu chỉ mới mỗi 2 giây nên vẽ dày hơn là vẽ lại đúng
+     thứ cũ — bằng thông tin mà nửa số việc. */
+  taiTrangThai();
+  setInterval(taiTrangThai, 2000);
+}
+
+/* Bot cần chạm vào trạng thái từ bên ngoài (ghi ảnh, nạp ghim.txt). Chỉ mở ở chế
+   độ bot; trình duyệt không có __BOT__ nên không bao giờ sinh biến toàn cục này. */
+if (LA_BOT) globalThis.__botAPI = {
+  anhTrangThai, dongBoGhim, engines, scan, logStat,
+  /* Ba biến của socket thanh lý là biến cục bộ trong khối script, không nằm trên
+     object nào — nên phải có hàm này để bot.js đọc được mà giám sát. */
+  trangThaiLq: () => ({lastMsg: lqLastMsg, lastData: lqLastData, loiCuoi: lqLoiCuoi})
+};
 </script>
 </body>
 </html>
